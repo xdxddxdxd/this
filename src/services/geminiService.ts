@@ -19,13 +19,25 @@ export const geminiService = {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const base64Data = imageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
 
-        const ocrPrompt = `Sen bir Türkçe OCR ve soru tespit uzmanısın.
-Bu görseldeki tüm Türkçe soruları:
-1. Soru numaralarını (1., 2., 3...)
-2. Soru kökünü/ana metnini
-3. Varsa A, B, C, D, E şıklarını
-4. Altı çizili veya numaralandırılmış kelimeleri
-birebir eksiksiz metne dök. Başka hiçbir yorum ekleme, sadece soruyu oku.`;
+        const ocrPrompt = `Sen Türkiye TYT/YKS Türkçe sınav kağıtları için en üst düzey OCR ve metin transkripsiyon uzmanısın.
+
+GÖREVİN:
+Bu görseldeki Türkçe test sorularını harfi harfine, kelimesi kelimesine eksiksiz ve hatasız olarak metne dökmektir.
+
+KRİTİK DÜZEN VE OKUMA KURALLARI:
+1. ÇİFT SÜTUN DÜZENİ: Sayfada 2 sütun (sol ve sağ) varsa, ASLA satırları yatayda birleştirme! Önce sol sütundaki soruları (1, 2, 3, 4, 5, 6...) baştan sona oku. Ardından sağ sütundaki soruları (7, 8, 9, 10, 11, 12...) oku.
+2. KELİME BOŞLUKLARI: Kelimeleri asla birbirine yapıştırma. Kelimeler arasındaki boşlukları net olarak koru (örnek: "3 haziranda yurda", "batıda kaygı", "dosyanı da", "ayak üstü", "ortaklığa devir etti").
+3. TÜRKÇE KARAKTERLER: ç, ğ, ı, İ, ö, ş, ü, â, î, û harflerini ve kesme işaretlerini (') görselde nasıl yazılmışsa birebir aynı şekilde transkribe et.
+4. ŞIK VE SORU FORMATI:
+Her soruyu şu net şablonda alt alta yaz:
+1. [Soru Kökü]
+A) [Seçenek]
+B) [Seçenek]
+C) [Seçenek]
+D) [Seçenek]
+E) [Seçenek]
+
+Başka hiçbir yorum, açıklama veya cevap ekleme; yalnızca kağıttaki soruları eksiksiz transkribe et.`;
 
         const result = await model.generateContent([
           ocrPrompt,
