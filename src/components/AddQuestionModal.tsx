@@ -32,6 +32,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
     setMode(initialMode);
   }, [initialMode]);
 
+  // Rotate random TYT rules every 4 seconds during waiting experience
   useEffect(() => {
     let interval: any;
     if (isLoading) {
@@ -48,8 +49,36 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.85);
+            setImagePreview(compressed);
+          } else {
+            setImagePreview(event.target?.result as string);
+          }
+        };
+        img.src = event.target?.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -100,6 +129,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
   return (
     <div className="modal-overlay" onClick={handleCloseModal}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
         <div style={{ padding: '18px 20px 14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)' }}>
           <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 700 }}>
             {analyzedResult ? 'Analiz Sonucu' : 'Yeni Soru / Kelime Ekle'}
@@ -112,6 +142,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
           </button>
         </div>
 
+        {/* 1. LOADING & WAITING EXPERIENCE */}
         {isLoading && (
           <div className="waiting-container">
             <div className="waiting-spinner-ring" />
@@ -129,8 +160,10 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
           </div>
         )}
 
+        {/* 2. INPUT FORM */}
         {!isLoading && !analyzedResult && (
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Mode Switcher Tabs */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-card-secondary)', padding: '4px', borderRadius: '12px' }}>
               <button
                 type="button"
@@ -269,6 +302,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
           </div>
         )}
 
+        {/* 3. RESULT PREVIEW & CONFIRMATION */}
         {!isLoading && analyzedResult && (
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="exam-paper-card" style={{ padding: '16px' }}>
@@ -291,6 +325,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
               </div>
             </div>
 
+            {/* Rule & Explanation */}
             <div className="rule-explanation-card" style={{ padding: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <span style={{ fontWeight: 700, fontSize: '0.95rem', fontFamily: 'var(--font-serif)' }}>Yazım Kuralı</span>
@@ -301,6 +336,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
               </div>
             </div>
 
+            {/* Coach Note */}
             {analyzedResult.coach_note && (
               <div className="coach-note-card" style={{ padding: '14px' }}>
                 <div style={{ fontWeight: 700, fontSize: '0.95rem', fontFamily: 'var(--font-serif)', marginBottom: '6px' }}>
@@ -312,6 +348,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
               </div>
             )}
 
+            {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button className="btn-primary" style={{ flex: 1 }} onClick={handleConfirmSave}>
                 <Check size={18} /> Onayla ve Kaydet
