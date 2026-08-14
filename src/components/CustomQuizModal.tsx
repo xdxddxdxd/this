@@ -7,13 +7,13 @@ import { quizGeneratorService, DynamicQuizQuestion, QuizConfig } from '../servic
 interface CustomQuizModalProps {
   isOpen: boolean;
   onClose: () => void;
-  errors: UserError[];
+  errors?: UserError[];
 }
 
 export const CustomQuizModal: React.FC<CustomQuizModalProps> = ({
   isOpen,
   onClose,
-  errors
+  errors = []
 }) => {
   // Modal Stages: 'setup' | 'exam' | 'results'
   const [stage, setStage] = useState<'setup' | 'exam' | 'results'>('setup');
@@ -34,8 +34,8 @@ export const CustomQuizModal: React.FC<CustomQuizModalProps> = ({
   // Unique categories from user errors
   const categories = useMemo(() => {
     const set = new Set<string>();
-    errors.forEach((e) => {
-      if (e.rule_category) set.add(e.rule_category);
+    (errors || []).forEach((e) => {
+      if (e && e.rule_category) set.add(e.rule_category);
     });
     return ['Tümü', ...Array.from(set)];
   }, [errors]);
@@ -82,7 +82,7 @@ export const CustomQuizModal: React.FC<CustomQuizModalProps> = ({
       durationMinutes
     };
 
-    const questions = await quizGeneratorService.generateCustomQuiz(errors, config);
+    const questions = await quizGeneratorService.generateCustomQuiz(errors || [], config);
     setQuizQuestions(questions);
     setCurrentIdx(0);
     setUserAnswers({});
@@ -152,7 +152,7 @@ export const CustomQuizModal: React.FC<CustomQuizModalProps> = ({
   const optionKeys = ['A', 'B', 'C', 'D', 'E'] as const;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
       <div
         className="modal-content"
         onClick={(e) => e.stopPropagation()}

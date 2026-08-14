@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Bookmark, Plus, Award, Sparkles, Sliders } from 'lucide-react';
+import { Search, Bookmark, Plus, Award, Sliders } from 'lucide-react';
 import { UserError } from '../types';
 import { CustomQuizModal } from './CustomQuizModal';
 
@@ -25,8 +25,8 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
   // Extract unique categories
   const categories = useMemo(() => {
     const set = new Set<string>();
-    errors.forEach((e) => {
-      if (e.rule_category) set.add(e.rule_category);
+    (errors || []).forEach((e) => {
+      if (e && e.rule_category) set.add(e.rule_category);
     });
     return ['Tümü', ...Array.from(set)];
   }, [errors]);
@@ -34,12 +34,12 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
   // Filter errors
   const filteredErrors = useMemo(() => {
     const cleanSearch = searchTerm.trim().toLocaleLowerCase('tr-TR');
-    return errors.filter((item) => {
+    return (errors || []).filter((item) => {
       const matchesSearch =
         !cleanSearch ||
-        item.wrong_word.toLocaleLowerCase('tr-TR').includes(cleanSearch) ||
-        item.correct_word.toLocaleLowerCase('tr-TR').includes(cleanSearch) ||
-        item.question_text.toLocaleLowerCase('tr-TR').includes(cleanSearch) ||
+        (item.wrong_word && item.wrong_word.toLocaleLowerCase('tr-TR').includes(cleanSearch)) ||
+        (item.correct_word && item.correct_word.toLocaleLowerCase('tr-TR').includes(cleanSearch)) ||
+        (item.question_text && item.question_text.toLocaleLowerCase('tr-TR').includes(cleanSearch)) ||
         (item.explanation && item.explanation.toLocaleLowerCase('tr-TR').includes(cleanSearch));
 
       const matchesCategory = selectedCategory === 'Tümü' || item.rule_category === selectedCategory;
@@ -65,7 +65,7 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
         <div>
           <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', fontWeight: 700 }}>Hatalarım</h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            Toplam <strong>{errors.length}</strong> kayıtlı yazım yanlışı
+            Toplam <strong>{errors?.length || 0}</strong> kayıtlı yazım yanlışı
           </p>
         </div>
 
@@ -79,7 +79,7 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
       </div>
 
       {/* 🎯 "Kişiselleştirilmiş Sınav Oluştur" (Zorluk, Süre, Konu ve Soru Sayısı Ayarlı) */}
-      {errors.length > 0 && (
+      {(errors && errors.length > 0) && (
         <div
           onClick={() => setIsQuizModalOpen(true)}
           style={{
@@ -97,7 +97,7 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
           className="quiz-banner-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Award size={22} />
             </div>
             <div>
@@ -111,8 +111,13 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
           </div>
 
           <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsQuizModalOpen(true);
+            }}
             className="btn-primary"
-            style={{ padding: '8px 14px', fontSize: '0.8rem', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+            style={{ padding: '8px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
           >
             <Sliders size={14} /> Yapılandır
           </button>
