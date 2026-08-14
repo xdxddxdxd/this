@@ -19,8 +19,8 @@ export const geminiService = {
     try {
       if (GEMINI_API_KEY) {
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        // Using Gemini 2.0 Flash for next-gen high-precision multimodal OCR
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        // Using verified Gemini 2.5 Flash for next-gen high-precision multimodal OCR
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         const base64Data = imageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
 
