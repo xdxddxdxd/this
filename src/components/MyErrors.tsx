@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Bookmark, Plus, Award, Sliders } from 'lucide-react';
 import { UserError } from '../types';
-import { CustomQuizModal } from './CustomQuizModal';
 
 interface MyErrorsProps {
   errors: UserError[];
   onSelectError: (error: UserError) => void;
   onOpenAddModal: () => void;
+  onOpenQuiz: () => void;
   onToggleFavorite: (id: string, isFav: boolean) => void;
   onDeleteError: (id: string) => void;
 }
@@ -15,12 +15,12 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
   errors,
   onSelectError,
   onOpenAddModal,
+  onOpenQuiz,
   onToggleFavorite
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
 
   // Extract unique categories
   const categories = useMemo(() => {
@@ -81,7 +81,7 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
       {/* 🎯 "Kişiselleştirilmiş Sınav Oluştur" (Zorluk, Süre, Konu ve Soru Sayısı Ayarlı) */}
       {(errors && errors.length > 0) && (
         <div
-          onClick={() => setIsQuizModalOpen(true)}
+          onClick={onOpenQuiz}
           style={{
             backgroundColor: 'var(--bg-card)',
             border: '1.5px solid var(--color-border)',
@@ -114,7 +114,7 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              setIsQuizModalOpen(true);
+              onOpenQuiz();
             }}
             className="btn-primary"
             style={{ padding: '8px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
@@ -232,13 +232,6 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
           ))
         )}
       </div>
-
-      {/* Custom Configurable Quiz Modal */}
-      <CustomQuizModal
-        isOpen={isQuizModalOpen}
-        onClose={() => setIsQuizModalOpen(false)}
-        errors={errors}
-      />
     </div>
   );
 };

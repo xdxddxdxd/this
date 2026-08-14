@@ -10,6 +10,7 @@ import { AddQuestionModal } from './components/AddQuestionModal';
 import { QuestionDetailModal } from './components/QuestionDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { OnboardingView } from './components/OnboardingView';
+import { CustomQuizModal } from './components/CustomQuizModal';
 
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => authService.getCurrentUser());
@@ -57,6 +58,7 @@ export function App() {
   const [addModalMode, setAddModalMode] = useState<'text' | 'photo'>('text');
   const [selectedError, setSelectedError] = useState<UserError | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
 
   // Load user errors on mount or when user changes
   useEffect(() => {
@@ -147,6 +149,7 @@ export function App() {
             errors={errors}
             onSelectError={(err) => setSelectedError(err)}
             onOpenAddModal={() => handleOpenAdd('text')}
+            onOpenQuiz={() => setIsQuizModalOpen(true)}
             onToggleFavorite={handleToggleFavorite}
             onDeleteError={handleDeleteError}
           />
@@ -179,7 +182,7 @@ export function App() {
         initialMode={addModalMode}
       />
 
-      {/* Soru Detay Modalı (Mockup 1) */}
+      {/* Soru Detay Modalı */}
       {selectedError && (
         <QuestionDetailModal
           errorItem={selectedError}
@@ -189,7 +192,7 @@ export function App() {
         />
       )}
 
-      {/* Giriş / Arkadaş Değiştirme Modalı */}
+      {/* Giriş / Hesap Değiştirme Modalı */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
@@ -197,6 +200,13 @@ export function App() {
           setCurrentUser(user);
           setIsAuthModalOpen(false);
         }}
+      />
+
+      {/* 🎯 Kişiselleştirilmiş Özel Hata Sınavı Modalı */}
+      <CustomQuizModal
+        isOpen={isQuizModalOpen}
+        onClose={() => setIsQuizModalOpen(false)}
+        errors={errors}
       />
     </div>
   );
