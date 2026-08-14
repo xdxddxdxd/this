@@ -71,8 +71,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess }) => 
         </div>
 
         <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.02rem', color: 'var(--text-primary)', lineHeight: 1.8, marginBottom: '12px' }}>
-          "Bu konuda <span className="struck-word">herzaman</span>{' '}
-          <span className="handwritten-correction" style={{ fontSize: '1.35rem' }}>^ her zaman</span> dikkatli olmalıyız."
+          "Bu konuda <del className="struck-word">herzaman</del>{' '}
+          <span className="correction-badge-inline">
+            <span className="caret-arrow">^</span>
+            <span>her zaman</span>
+          </span>{' '}
+          dikkatli olmalıyız."
         </div>
 
         <div className="coach-note-card" style={{ padding: '12px 14px', margin: 0 }}>

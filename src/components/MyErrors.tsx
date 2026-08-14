@@ -152,21 +152,12 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
               <div className="quote-mark">“</div>
               <div className="card-content-left">
                 <div className="snippet-text">
-                  <div style={{ lineHeight: 1.8 }}>
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-handwriting)',
-                        color: 'var(--color-red)',
-                        fontSize: '1.25rem',
-                        fontWeight: 700,
-                        display: 'block',
-                        lineHeight: 1,
-                        marginBottom: '-4px'
-                      }}
-                    >
-                      {item.correct_word} <span className="correction-caret">^</span>
+                  <div style={{ lineHeight: 1.7 }}>
+                    <del className="struck-word">{item.wrong_word}</del>
+                    <span className="correction-badge-inline">
+                      <span className="caret-arrow">^</span>
+                      <span>{item.correct_word}</span>
                     </span>
-                    <span className="struck-word">{item.wrong_word}</span>
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>
                       — {item.question_text.slice(0, 45)}...
                     </span>
