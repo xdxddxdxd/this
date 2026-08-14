@@ -10,17 +10,21 @@ import { AddQuestionModal } from './components/AddQuestionModal';
 import { QuestionDetailModal } from './components/QuestionDetailModal';
 import { AuthModal } from './components/AuthModal';
 
+import { LoginView } from './components/LoginView';
+
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => authService.getCurrentUser());
   const [activeTab, setActiveTab] = useState<'dashboard' | 'errors' | 'profile'>('dashboard');
   const [errors, setErrors] = useState<UserError[]>([]);
   const [isLoadingErrors, setIsLoadingErrors] = useState(true);
 
+  // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addModalMode, setAddModalMode] = useState<'text' | 'photo'>('text');
   const [selectedError, setSelectedError] = useState<UserError | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
+  // Load user errors on mount or when user changes
   useEffect(() => {
     if (currentUser) {
       setIsLoadingErrors(true);
@@ -31,6 +35,7 @@ export function App() {
     }
   }, [currentUser]);
 
+  // Handle saving new analyzed question
   const handleSaveAnalyzedQuestion = async (result: AnalysisResult) => {
     if (!currentUser) return;
     const newRecord = await errorService.addError({
@@ -50,6 +55,7 @@ export function App() {
     setErrors((prev) => [newRecord, ...prev.filter((e) => e.id !== newRecord.id)]);
   };
 
+  // Handle updating an existing error
   const handleUpdateError = async (id: string, updates: Partial<UserError>) => {
     if (!currentUser) return;
     await errorService.updateError(id, updates, currentUser.id);
@@ -61,6 +67,7 @@ export function App() {
     }
   };
 
+  // Handle deleting an error
   const handleDeleteError = async (id: string) => {
     if (!currentUser) return;
     await errorService.deleteError(id, currentUser.id);
@@ -70,6 +77,7 @@ export function App() {
     }
   };
 
+  // Handle toggle favorite
   const handleToggleFavorite = async (id: string, isFav: boolean) => {
     if (!currentUser) return;
     await handleUpdateError(id, { is_favorite: isFav });
@@ -80,34 +88,14 @@ export function App() {
     setIsAddModalOpen(true);
   };
 
+  // If no user is logged in, show direct Login / Registration screen
   if (!currentUser) {
-    return (
-      <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-        <div style={{ textAlign: 'center', maxWidth: '340px' }}>
-          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', color: 'var(--text-primary)', marginBottom: '8px' }}>
-            TDK Projesi <span className="red-dot" />
-          </h1>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '24px' }}>
-            TYT Türkçe denemelerindeki yazım yanlışlarını takip et ve öğren.
-          </p>
-          <button className="btn-primary" style={{ width: '100%' }} onClick={() => setIsAuthModalOpen(true)}>
-            Giriş Yap / Kaydol
-          </button>
-        </div>
-        <AuthModal
-          isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
-          onSuccess={(user) => {
-            setCurrentUser(user);
-            setIsAuthModalOpen(false);
-          }}
-        />
-      </div>
-    );
+    return <LoginView onSuccess={(user) => setCurrentUser(user)} />;
   }
 
   return (
     <div className="app-container">
+      {/* Main Tab Content */}
       <main style={{ flex: 1 }}>
         {activeTab === 'dashboard' && (
           <Dashboard
@@ -143,8 +131,10 @@ export function App() {
         )}
       </main>
 
+      {/* Persistent Mobile Bottom Navigation */}
       <BottomNav activeTab={activeTab} onChangeTab={(tab) => setActiveTab(tab)} />
 
+      {/* Soru Ekleme & Fotoğraf Çekme Modalı */}
       <AddQuestionModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -153,6 +143,7 @@ export function App() {
         initialMode={addModalMode}
       />
 
+      {/* Soru Detay Modalı (Mockup 1) */}
       {selectedError && (
         <QuestionDetailModal
           errorItem={selectedError}
@@ -162,6 +153,7 @@ export function App() {
         />
       )}
 
+      {/* Giriş / Arkadaş Değiştirme Modalı */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
