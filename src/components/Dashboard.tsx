@@ -1,13 +1,11 @@
 import React from 'react';
-import { Bookmark, PenLine, Type, Camera, ChevronRight, Edit, Moon, Sun } from 'lucide-react';
+import { Bookmark, PenLine, Type, Camera, ChevronRight, Edit } from 'lucide-react';
 import { User, UserError } from '../types';
 import { errorService } from '../services/errorService';
 
 interface DashboardProps {
   user: User;
   errors: UserError[];
-  theme?: 'dark' | 'light';
-  onToggleTheme?: () => void;
   onOpenAddModal: (mode: 'text' | 'photo') => void;
   onSelectError: (error: UserError) => void;
   onViewAllErrors: () => void;
@@ -17,8 +15,6 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({
   user,
   errors,
-  theme = 'dark',
-  onToggleTheme,
   onOpenAddModal,
   onSelectError,
   onViewAllErrors,
@@ -90,45 +86,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingBottom: '30px' }}>
-      {/* 1. Header (Greeting + Notebook Counter & Theme Switcher) */}
+      {/* 1. Header (Greeting + Notebook Counter) */}
       <header className="top-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h1 className="greeting-title">
-              Merhaba, {user.full_name || 'Öğrenci'} <span className="red-dot" />
-            </h1>
-          </div>
+          <h1 className="greeting-title">
+            Merhaba, {user.full_name || 'Öğrenci'} <span className="red-dot" />
+          </h1>
           <p className="greeting-subtitle">Bugün biraz daha iyi yazalım.</p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-          {/* Notebook Counter Card */}
-          <div className="stat-counter-card">
-            <div className="stat-label-top">Toplam Kayıtlı Hata</div>
-            <div className="stat-number">{totalCount}</div>
-            <div className="stat-label-bottom">kelime</div>
-          </div>
-
-          {/* Quick Theme Toggle Button */}
-          {onToggleTheme && (
-            <button
-              onClick={onToggleTheme}
-              className="theme-toggle-btn"
-              title={theme === 'dark' ? 'Aydınlık Siyah-Beyaz Moduna Geç' : 'Karanlık Siyah-Beyaz Moduna Geç'}
-            >
-              {theme === 'dark' ? (
-                <>
-                  <Sun size={13} style={{ color: '#FFD166' }} />
-                  <span>Aydınlık</span>
-                </>
-              ) : (
-                <>
-                  <Moon size={13} />
-                  <span>Karanlık</span>
-                </>
-              )}
-            </button>
-          )}
+        {/* Notebook Counter Card */}
+        <div className="stat-counter-card">
+          <div className="stat-label-top">Toplam Kayıtlı Hata</div>
+          <div className="stat-number">{totalCount}</div>
+          <div className="stat-label-bottom">kelime</div>
         </div>
       </header>
 

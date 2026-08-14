@@ -17,19 +17,39 @@ export function App() {
   const [errors, setErrors] = useState<UserError[]>([]);
   const [isLoadingErrors, setIsLoadingErrors] = useState(true);
 
-  // Black & White Theme State (Persisted in localStorage)
+  // Black & White Theme State (Initializes from saved preference or OS system theme)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('tdk_theme');
-    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+    if (saved === 'light' || saved === 'dark') {
+      return saved;
+    }
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'dark'; // Default fallback to dark B&W
   });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('tdk_theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  // Listen to OS system theme changes if user hasn't explicitly set a preference
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      const explicit = localStorage.getItem('tdk_theme');
+      if (!explicit) {
+        setTheme(e.matches ? 'dark' : 'light');
+      }
+    };
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+  }, []);
+
+  const handleSetTheme = (newTheme: 'dark' | 'light') => {
+    setTheme(newTheme);
+    localStorage.setItem('tdk_theme', newTheme);
   };
 
   // Modal States
@@ -104,13 +124,7 @@ export function App() {
 
   // If no user is logged in, show direct Onboarding & Login screen
   if (!currentUser) {
-    return (
-      <OnboardingView
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        onSuccess={(user) => setCurrentUser(user)}
-      />
-    );
+    return <OnboardingView onSuccess={(user) => setCurrentUser(user)} />;
   }
 
   return (
@@ -121,8 +135,6 @@ export function App() {
           <Dashboard
             user={currentUser}
             errors={errors}
-            theme={theme}
-            onToggleTheme={toggleTheme}
             onOpenAddModal={handleOpenAdd}
             onSelectError={(err) => setSelectedError(err)}
             onViewAllErrors={() => setActiveTab('errors')}
@@ -145,7 +157,7 @@ export function App() {
             user={currentUser}
             errors={errors}
             theme={theme}
-            onToggleTheme={toggleTheme}
+            onSetTheme={handleSetTheme}
             onLogout={() => {
               authService.logout();
               setCurrentUser(null);

@@ -1,12 +1,12 @@
 import React from 'react';
-import { User as UserIcon, LogOut, ShieldCheck, Database, Award, Users, Moon, Sun } from 'lucide-react';
+import { User as UserIcon, LogOut, ShieldCheck, Database, Award, Users, Moon, Sun, Sliders, Smartphone } from 'lucide-react';
 import { User, UserError } from '../types';
 
 interface ProfileProps {
   user: User;
   errors: UserError[];
-  theme?: 'dark' | 'light';
-  onToggleTheme?: () => void;
+  theme: 'dark' | 'light';
+  onSetTheme: (theme: 'dark' | 'light') => void;
   onLogout: () => void;
   onOpenAuth: () => void;
 }
@@ -14,8 +14,8 @@ interface ProfileProps {
 export const Profile: React.FC<ProfileProps> = ({
   user,
   errors,
-  theme = 'dark',
-  onToggleTheme,
+  theme,
+  onSetTheme,
   onLogout,
   onOpenAuth
 }) => {
@@ -27,112 +27,138 @@ export const Profile: React.FC<ProfileProps> = ({
   }, {});
 
   return (
-    <div style={{ padding: '24px 20px 80px 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Profile Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: 'var(--bg-card)', padding: '20px', borderRadius: '16px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-        <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <UserIcon size={28} />
+    <div style={{ padding: '20px 20px 80px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      
+      {/* 1. Profile Header Card */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', backgroundColor: 'var(--bg-card)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <UserIcon size={24} />
         </div>
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 700 }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.2 }}>
             {user.full_name || user.username}
           </h2>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>@{user.username}</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>@{user.username}</p>
         </div>
         <button
           onClick={onOpenAuth}
           className="btn-secondary"
-          style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+          style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
         >
-          <Users size={15} /> Değiştir
+          <Users size={14} /> Değiştir
         </button>
       </div>
 
-      {/* Theme Selection Card */}
-      <div className="rule-explanation-card">
-        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', fontWeight: 700, marginBottom: '12px' }}>
-          Görünüm ve Tema
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          <button
-            onClick={onToggleTheme}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '12px',
-              borderRadius: '12px',
-              border: theme === 'dark' ? '2px solid var(--color-red)' : '1px solid var(--color-border)',
-              backgroundColor: theme === 'dark' ? 'var(--bg-card-secondary)' : 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              fontWeight: 600,
-              fontSize: '0.88rem',
-              cursor: 'pointer'
-            }}
-          >
-            <Moon size={16} style={{ color: theme === 'dark' ? 'var(--color-red)' : 'var(--text-muted)' }} />
-            <span>Karanlık Tema</span>
-          </button>
-
-          <button
-            onClick={onToggleTheme}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '12px',
-              borderRadius: '12px',
-              border: theme === 'light' ? '2px solid var(--color-red)' : '1px solid var(--color-border)',
-              backgroundColor: theme === 'light' ? 'var(--bg-card-secondary)' : 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              fontWeight: 600,
-              fontSize: '0.88rem',
-              cursor: 'pointer'
-            }}
-          >
-            <Sun size={16} style={{ color: theme === 'light' ? 'var(--color-red)' : 'var(--text-muted)' }} />
-            <span>Aydınlık Tema</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Overview Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div className="stat-counter-card" style={{ padding: '16px' }}>
+      {/* 2. Overview Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <div className="stat-counter-card" style={{ padding: '12px 14px' }}>
           <div className="stat-label-top">Kişisel Hata Havuzu</div>
-          <div className="stat-number" style={{ fontSize: '2.2rem' }}>{errors.length}</div>
+          <div className="stat-number" style={{ fontSize: '1.85rem' }}>{errors.length}</div>
           <div className="stat-label-bottom">kayıtlı kelime</div>
         </div>
 
-        <div className="stat-counter-card" style={{ padding: '16px' }}>
+        <div className="stat-counter-card" style={{ padding: '12px 14px' }}>
           <div className="stat-label-top">Çalışılan Kural Grubu</div>
-          <div className="stat-number" style={{ fontSize: '2.2rem', color: 'var(--text-primary)' }}>
+          <div className="stat-number" style={{ fontSize: '1.85rem', color: 'var(--text-primary)' }}>
             {Object.keys(categoryStats).length}
           </div>
           <div className="stat-label-bottom">farklı TYT konusu</div>
         </div>
       </div>
 
-      {/* Category Breakdown */}
-      <div className="rule-explanation-card">
-        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px' }}>
+      {/* 3. Settings & Appearance (Kompakt Ayarlar Sekmesi) */}
+      <div className="rule-explanation-card" style={{ padding: '14px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+          <Sliders size={16} style={{ color: 'var(--text-muted)' }} />
+          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', fontWeight: 700, margin: 0 }}>
+            Ayarlar ve Tercihler
+          </h3>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* Theme Row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: 'var(--bg-card-secondary)', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {theme === 'dark' ? <Moon size={17} style={{ color: 'var(--color-red)' }} /> : <Sun size={17} style={{ color: 'var(--color-red)' }} />}
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>Tema Görünümü</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {theme === 'dark' ? 'Siyah (Karanlık Mod)' : 'Beyaz (Aydınlık Mod)'}
+                </div>
+              </div>
+            </div>
+
+            {/* Compact Switcher */}
+            <div style={{ display: 'inline-flex', background: 'var(--bg-card)', padding: '2px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+              <button
+                type="button"
+                onClick={() => onSetTheme('dark')}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: theme === 'dark' ? 'var(--color-red)' : 'transparent',
+                  color: theme === 'dark' ? '#FFFFFF' : 'var(--text-muted)',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Moon size={12} /> Siyah
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetTheme('light')}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: theme === 'light' ? 'var(--color-red)' : 'transparent',
+                  color: theme === 'light' ? '#FFFFFF' : 'var(--text-muted)',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Sun size={12} /> Beyaz
+              </button>
+            </div>
+          </div>
+
+          {/* System Device Sync Status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: 'var(--text-muted)', padding: '0 4px' }}>
+            <Smartphone size={14} />
+            <span>Cihaz temasıyla otomatik senkronize çalışır</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Category Breakdown */}
+      <div className="rule-explanation-card" style={{ padding: '14px 16px' }}>
+        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', fontWeight: 700, marginBottom: '12px' }}>
           Zayıf Noktalar & Kural Dağılımı
         </h3>
         {Object.keys(categoryStats).length === 0 ? (
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Henüz yeterli hata verisi toplanmadı.</p>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Henüz yeterli hata verisi toplanmadı.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {Object.entries(categoryStats).map(([cat, count]) => {
               const pct = Math.round((count / errors.length) * 100);
               return (
                 <div key={cat}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '3px' }}>
                     <span style={{ fontWeight: 600 }}>{cat}</span>
                     <span style={{ color: 'var(--text-secondary)' }}>{count} kez ({pct}%)</span>
                   </div>
-                  <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--bg-card-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: '5px', backgroundColor: 'var(--bg-card-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
                     <div
                       style={{
                         width: `${pct}%`,
@@ -149,34 +175,34 @@ export const Profile: React.FC<ProfileProps> = ({
         )}
       </div>
 
-      {/* System Status Card */}
-      <div className="rule-explanation-card">
-        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', fontWeight: 700, marginBottom: '12px' }}>
+      {/* 5. System Status Card */}
+      <div className="rule-explanation-card" style={{ padding: '14px 16px' }}>
+        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', fontWeight: 700, marginBottom: '10px' }}>
           Sistem ve Motor Durumu
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-            <Database size={16} />
-            <span>Supabase bulut veri tabanı bağlı</span>
+            <Database size={15} />
+            <span>Supabase bulut veri tabanı devrede</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-            <ShieldCheck size={16} />
-            <span>TDK Sözlük & Kural Motoru devrede</span>
+            <ShieldCheck size={15} />
+            <span>TDK Sözlük & Kural Motoru aktif</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-            <Award size={16} />
-            <span>Groq LLaMA 3.3 + Gemini Vision aktif</span>
+            <Award size={15} />
+            <span>Groq LLaMA 3.3 + Gemini Vision bağlı</span>
           </div>
         </div>
       </div>
 
-      {/* Logout Action */}
+      {/* 6. Logout Action */}
       <button
         onClick={onLogout}
         className="btn-secondary"
-        style={{ color: 'var(--color-red)', borderColor: 'var(--color-red-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+        style={{ color: 'var(--color-red)', borderColor: 'var(--color-red-border)', padding: '10px', fontSize: '0.88rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
       >
-        <LogOut size={18} /> Oturumu Kapat
+        <LogOut size={16} /> Oturumu Kapat
       </button>
     </div>
   );
