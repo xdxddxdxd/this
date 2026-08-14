@@ -53,6 +53,18 @@ Verilen soruyu A'dan E'ye tüm seçenekleriyle harf harf inceleyip yazım yanlı
 12. ÖZEL VE KALIPLAŞMIŞ SÖZCÜKLER:
    - "pek çok" (AYRI), "hiç kimse" (AYRI), "bir gün" (AYRI), "birkaç" (BİTİŞİK), "hiçbir" (BİTİŞİK), "bugün" (BİTİŞİK).
 
+STANDART TYT KURAL KATEGORİLERİ (rule_category alanı sadece bu standart başlıklardan biri olmalıdır):
+- "Büyük Harflerin Yazımı" (Ülke, devlet, kişi, kurum, gezegen, özel adlar ve unvanlar için)
+- "Bitişik Yazılan Birleşik Kelimeler" (-sever, altüst, ateşböceği, sivribiber vb.)
+- "Ayrı Yazılan Kelimeler" (şehirler arası, yeşil biber, ikilemeler, pek çok vb.)
+- "Bağlaç Olan Da / De'nin Yazımı"
+- "Bağlaç Olan Ki'nin Yazımı"
+- "Kısaltmaların Yazımı" (THY'nin, MEB'in vb.)
+- "Tarih ve Sayıların Yazımı" (3 Haziran'da vb.)
+- "Ses Olayları ve Yardımcı Fiiller" (devretti, şükretti vb.)
+- "Düzeltme İşareti (Şapka ^)" (tezgâh, dükkân vb.)
+- "Yazımı Karıştırılan Sözcükler"
+
 ÖNEMLİ KURAL:
 - "correct_word" asla başka bir kelimeyle (örneğin simit vb.) değiştirilemez! Yalnızca o kelimenin imla kuralına uygun doğru yazılışı olmalıdır.
 - "wrong_word" ve "correct_word" ASLA birebir aynı olamaz!
@@ -67,12 +79,12 @@ JSON FORMATI:
     "D": "D seçeneği",
     "E": "E seçeneği"
   },
-  "wrong_option": "B",
-  "wrong_word": "ayak üstü",
-  "correct_word": "ayaküstü",
-  "rule_category": "Bitişik Yazılan Kelimeler",
-  "explanation": "TDK'ye göre somut yer bildirmeyen alt/üst sözleri bitişik yazılır.",
-  "coach_note": "ÖSYM alt/üst/üzeri birleşiklerini çok sık sorar.",
+  "wrong_option": "C",
+  "wrong_word": "güney Afrika Cumhuriyeti",
+  "correct_word": "Güney Afrika Cumhuriyeti",
+  "rule_category": "Büyük Harflerin Yazımı",
+  "explanation": "TDK kurallarına göre devlet ve ülke adlarını oluşturan tüm sözcükler büyük harfle başlar.",
+  "coach_note": "Ülke ve devlet adlarının yazımı TYT'de sıkça sorulur.",
   "difficulty_score": 6
 }`;
 
