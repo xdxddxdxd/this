@@ -12,33 +12,40 @@ GÖREVİN:
 Verilen soruyu A'dan E'ye tüm seçenekleriyle harf harf inceleyip yazım yanlışı olan tek şıkkı, hatalı kelimeyi ve TDK doğrusunu %100 doğrulukla bulmaktır.
 
 ÖSYM VE TDK TEST KURALLARI REHBERİ:
-1. İKİLEMELER:
-   - İkilemeler HER ZAMAN AYRI yazılır: "başa baş" (başabaş YANLIŞTIR), "içli dışlı" (içlidışlı YANLIŞTIR), "art arda", "yan yana", "tek tek", "el ele".
+1. "-SEVER" EKİYLE KURULAN BİRLEŞİK KELİMELER:
+   - HER ZAMAN BİTİŞİK YAZILIR: "doğasever", "vatansever", "kitapsever", "hayvansever", "sanatsever", "müziksever". (Ayrı yazılırsa YANLIŞTIR).
 
-2. DÜZELTME İŞARETİ (ŞAPKA ^):
+2. BİTİŞİK YAZILAN BÖCEK VE BİTKİ/YİYECEK ADLARI:
+   - "ateşböceği", "uğurböceği", "ağustosböceği" BİTİŞİK yazılır. ("ateş böceği" ayrı yazılırsa YANLIŞTIR).
+   - "sivribiber", "karabiber", "zeytinyağı", "zeytinyağlı", "başpıtrak" BİTİŞİK yazılır. ("sivri biber" ayrı yazılırsa YANLIŞTIR).
+   - "yeşil zeytin", "kuru fasulye", "yeşil biber" AYRI yazılır.
+
+3. "ALTÜST" SÖZCÜĞÜ:
+   - "altüst etmek", "altüst olmak" kalıplaşmış birleşik eylem olduğu için BİTİŞİK yazılır. ("alt üst etti" YANLIŞTIR -> "altüst etti").
+
+4. "-ARASI" SÖZLERİ:
+   - "şehirler arası", "okullar arası", "milletler arası" AYRI yazılır.
+
+5. İKİLEMELER:
+   - "enine boyuna", "başa baş", "içli dışlı", "art arda", "yan yana", "canla başla", "tek tek" AYRI yazılır. Cümlede ayrı yazılmışsa DOĞRUDUR. ("başabaş", "içlidışlı" YANLIŞTIR).
+
+6. DÜZELTME İŞARETİ (ŞAPKA ^):
    - TDK sözlüğünde düzeltme işareti olan sözcükler şapkasız yazılırsa yazım yanlışıdır:
      "tezgâh" -> tezgah YANLIŞTIR!
      "dükkân" -> dukkan YANLIŞTIR!
      "kâğıt" -> kagit YANLIŞTIR!
      "rüzgâr" -> ruzgar YANLIŞTIR!
-     "hâlâ" -> hala YANLIŞTIR!
 
-3. BİTİŞİK YAZILAN BİRLEŞİK SÖZCÜKLER:
-   - "zeytinyağı", "zeytinyağlı" BİTİŞİK yazılır (zeytin yağlı YANLIŞTIR).
-   - "gökyüzü", "yerküre", "seferber", "akşamüstü", "birdenbire", "gitgide" BİTİŞİK yazılır.
-   - "birtakım" 'bazı' anlamındaysa BİTİŞİK ("birtakım sorunlar"). Sayı anlamındaysa AYRI ("bir takım elbise").
+7. BÜYÜK HARFLER VE KESME İŞARETİ:
+   - Kurum, kuruluş, kurul ve bakanlık adlarına gelen ekler kesmeyle AYRILMAZ: "Kültür ve Turizm Bakanlığının" (DOĞRU), "Ankara Üniversitesinin" (DOĞRU).
+   - Dönem/çağ adlarında özel ada dahil olmayan sözcükler küçük: "Türk edebiyatı" (edebiyat küçük).
 
-4. AYRI YAZILANLAR:
-   - "şehir dışı", "sıra dışı", "hafta sonu", "gök mavisi", "ana yemek", "her bir", "göz ardı", "köpek yavrusu", "çevrim içi", "veri tabanı", "her an", "akşam yemeği".
-   - Yardımcı fiillerde ses olayı yoksa AYRI: "arz etti" (arzetti YANLIŞTIR), "fark etti", "terk etti", "hak etti", "ayırt etti".
-   - Ses olayı (düşme/türeme) varsa BİTİŞİK: "şükretti", "sabretti", "azmetti", "zehretti", "affetti", "hissetti".
+8. BELGİSİZ SIFAT "BİRTAKIM":
+   - "Bazı" anlamında BİTİŞİK ("birtakım sorunlar"). Sayı anlamında AYRI ("bir takım elbise").
 
-5. KESME İŞARETİ KURALI:
-   - Kurum, kuruluş ve üniversite adlarına gelen ekler kesmeyle AYRILMAZ: "Ankara Üniversitesinin" (Ankara Üniversitesi'nin YANLIŞTIR), "Türk Dil Kurumunun".
-
-ŞARTLAR:
-- "wrong_word": Seçenekteki hatalı yazılan kelime/ifade.
-- "correct_word": TDK'ye göre düzeltilmiş hali. ASLA wrong_word ile birebir aynı olamaz!
+ÖNEMLİ KURAL:
+- "correct_word" asla başka bir kelimeyle (örneğin simit vb.) değiştirilemez! Yalnızca o kelimenin imla kuralına uygun doğru yazılışı (örneğin: sivri biber -> sivribiber, ateş böcekleri -> ateşböcekleri, alt üst -> altüst) olmalıdır.
+- "wrong_word" ve "correct_word" ASLA birebir aynı olamaz!
 
 JSON FORMATI:
 {
@@ -50,12 +57,12 @@ JSON FORMATI:
     "D": "D seçeneği",
     "E": "E seçeneği"
   },
-  "wrong_option": "A",
-  "wrong_word": "başabaş",
-  "correct_word": "başa baş",
-  "rule_category": "İkilemelerin Yazımı",
-  "explanation": "İkilemeler her zaman ayrı yazılır. Bu nedenle 'başabaş' değil 'başa baş' olmalıdır.",
-  "coach_note": "TYT Türkçe sınavında ikilemelerin ve birleşik sözcüklerin yazımı sık sık test edilir.",
+  "wrong_option": "E",
+  "wrong_word": "sivri biber",
+  "correct_word": "sivribiber",
+  "rule_category": "Bitişik Yazılan Kelimeler",
+  "explanation": "TDK'ye göre 'sivribiber' bitişik yazılır.",
+  "coach_note": "TYT'de yiyecek ve bitki adlarının yazımı sıkça test edilir.",
   "difficulty_score": 6
 }`;
 
@@ -237,6 +244,10 @@ export const groqService = {
       { wrong: 'zeytin yağlı', correct: 'zeytinyağlı', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'zeytinyağı' ve 'zeytinyağlı' kalıplaşmış olarak bitişik yazılır." },
       { wrong: 'zeytin yağı', correct: 'zeytinyağı', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'zeytinyağı' bitişik yazılır." },
       { wrong: 'dere otu', correct: 'dereotu', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'dereotu' bitişik yazılır." },
+      { wrong: 'sivri biber', correct: 'sivribiber', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'sivribiber' kalıplaşmış olarak bitişik yazılır." },
+      { wrong: 'ateş böcekleri', correct: 'ateşböcekleri', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'ateşböceği' kalıplaşmış olarak bitişik yazılır." },
+      { wrong: 'alt üst', correct: 'altüst', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'altüst etmek' kalıplaşmış olarak bitişik yazılır." },
+      { wrong: 'doğa severlerin', correct: 'doğaseverlerin', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre '-sever' ekiyle kurulan sözcükler bitişik yazılır." },
 
       // 4. Yardımcı Fiiller
       { wrong: 'arzetti', correct: 'arz etti', category: 'Ayrı Yazılan Kelimeler', exp: "Ses olayı (düşme/türeme) olmayan birleşik fiiller ayrı yazılır." },
