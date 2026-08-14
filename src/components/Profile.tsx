@@ -1,6 +1,7 @@
-import React from 'react';
-import { User as UserIcon, LogOut, ShieldCheck, Database, Award, Users, Moon, Sun, Sliders, Smartphone } from 'lucide-react';
+import React, { useState } from 'react';
+import { User as UserIcon, LogOut, ShieldCheck, Database, Award, Users, Moon, Sun, Sliders, Smartphone, Printer, FileText } from 'lucide-react';
 import { User, UserError } from '../types';
+import { PdfExportModal } from './PdfExportModal';
 
 interface ProfileProps {
   user: User;
@@ -19,6 +20,8 @@ export const Profile: React.FC<ProfileProps> = ({
   onLogout,
   onOpenAuth
 }) => {
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+
   // Category distribution
   const categoryStats = errors.reduce((acc: Record<string, number>, curr) => {
     const cat = curr.rule_category || 'Diğer';
@@ -49,7 +52,46 @@ export const Profile: React.FC<ProfileProps> = ({
         </button>
       </div>
 
-      {/* 2. Overview Stats */}
+      {/* 2. Sınav Öncesi Hata Kitapçığı (PDF / Yazdırma Çıktısı Kartı) */}
+      <div
+        onClick={() => setIsPdfModalOpen(true)}
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '14px',
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          boxShadow: 'var(--shadow-sm)',
+          transition: 'all 0.2s ease'
+        }}
+        className="pdf-export-card"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'var(--bg-card-secondary)', color: 'var(--color-red)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <FileText size={20} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+              Sınav Öncesi Hata Kitapçığım (PDF)
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              Tüm soruları açıklamalı A4 formatında yazdır / kaydet
+            </div>
+          </div>
+        </div>
+
+        <button
+          className="btn-secondary"
+          style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'none' }}
+        >
+          <Printer size={14} /> Kitapçığı Aç
+        </button>
+      </div>
+
+      {/* 3. Overview Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         <div className="stat-counter-card" style={{ padding: '12px 14px' }}>
           <div className="stat-label-top">Kişisel Hata Havuzu</div>
@@ -66,7 +108,7 @@ export const Profile: React.FC<ProfileProps> = ({
         </div>
       </div>
 
-      {/* 3. Settings & Appearance (Kompakt Ayarlar Sekmesi) */}
+      {/* 4. Settings & Appearance (Kompakt Ayarlar Sekmesi) */}
       <div className="rule-explanation-card" style={{ padding: '14px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
           <Sliders size={16} style={{ color: 'var(--text-muted)' }} />
@@ -141,7 +183,7 @@ export const Profile: React.FC<ProfileProps> = ({
         </div>
       </div>
 
-      {/* 4. Category Breakdown */}
+      {/* 5. Category Breakdown */}
       <div className="rule-explanation-card" style={{ padding: '14px 16px' }}>
         <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', fontWeight: 700, marginBottom: '12px' }}>
           Zayıf Noktalar & Kural Dağılımı
@@ -175,7 +217,7 @@ export const Profile: React.FC<ProfileProps> = ({
         )}
       </div>
 
-      {/* 5. System Status Card */}
+      {/* 6. System Status Card */}
       <div className="rule-explanation-card" style={{ padding: '14px 16px' }}>
         <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', fontWeight: 700, marginBottom: '10px' }}>
           Sistem ve Motor Durumu
@@ -196,7 +238,7 @@ export const Profile: React.FC<ProfileProps> = ({
         </div>
       </div>
 
-      {/* 6. Logout Action */}
+      {/* 7. Logout Action */}
       <button
         onClick={onLogout}
         className="btn-secondary"
@@ -204,6 +246,14 @@ export const Profile: React.FC<ProfileProps> = ({
       >
         <LogOut size={16} /> Oturumu Kapat
       </button>
+
+      {/* PDF Export Modal */}
+      <PdfExportModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        user={user}
+        errors={errors}
+      />
     </div>
   );
 };

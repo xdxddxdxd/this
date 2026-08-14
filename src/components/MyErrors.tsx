@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Bookmark, Filter, Plus, Trash2 } from 'lucide-react';
+import { Search, Bookmark, Plus, Award, Sparkles } from 'lucide-react';
 import { UserError } from '../types';
+import { FlashcardQuizModal } from './FlashcardQuizModal';
 
 interface MyErrorsProps {
   errors: UserError[];
@@ -14,12 +15,12 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
   errors,
   onSelectError,
   onOpenAddModal,
-  onToggleFavorite,
-  onDeleteError
+  onToggleFavorite
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
 
   // Extract unique categories
   const categories = useMemo(() => {
@@ -77,6 +78,47 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
         </button>
       </div>
 
+      {/* 🎯 "Hatalarımı Tekrar Et" (Quiz / Flashcard Alıştırma Butonu) */}
+      {errors.length > 0 && (
+        <div
+          onClick={() => setIsQuizModalOpen(true)}
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            border: '1.5px solid var(--color-border)',
+            borderRadius: '14px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            boxShadow: 'var(--shadow-sm)',
+            transition: 'all 0.2s ease'
+          }}
+          className="quiz-banner-card"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Award size={22} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                Hatalarımı Tekrar Et (Quiz Modu)
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Havuzundaki {errors.length} sorudan kendini test et
+              </div>
+            </div>
+          </div>
+
+          <button
+            className="btn-primary"
+            style={{ padding: '8px 14px', fontSize: '0.8rem', pointerEvents: 'none' }}
+          >
+            <Sparkles size={14} /> Başla
+          </button>
+        </div>
+      )}
+
       {/* Search Input */}
       <div style={{ position: 'relative' }}>
         <Search
@@ -104,7 +146,7 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
             padding: '6px 12px',
             borderRadius: '20px',
             border: onlyFavorites ? '1px solid var(--color-red)' : '1px solid var(--color-border)',
-            background: onlyFavorites ? 'var(--color-red-light)' : '#FFFFFF',
+            background: onlyFavorites ? 'var(--color-red-light)' : 'var(--bg-card)',
             color: onlyFavorites ? 'var(--color-red)' : 'var(--text-secondary)',
             fontSize: '0.78rem',
             fontWeight: 600,
@@ -112,7 +154,7 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
             whiteSpace: 'nowrap'
           }}
         >
-          <Bookmark size={13} fill={onlyFavorites ? '#D6303F' : 'none'} /> Yıldızlılar
+          <Bookmark size={13} fill={onlyFavorites ? 'var(--color-red)' : 'none'} /> Yıldızlılar
         </button>
 
         {categories.map((cat) => (
@@ -122,9 +164,9 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
             style={{
               padding: '6px 12px',
               borderRadius: '20px',
-              border: selectedCategory === cat ? '1px solid var(--color-green)' : '1px solid var(--color-border)',
-              background: selectedCategory === cat ? 'var(--color-green-light)' : '#FFFFFF',
-              color: selectedCategory === cat ? 'var(--color-green)' : 'var(--text-secondary)',
+              border: selectedCategory === cat ? '1px solid var(--color-green-border)' : '1px solid var(--color-border)',
+              background: selectedCategory === cat ? 'var(--color-green-light)' : 'var(--bg-card)',
+              color: selectedCategory === cat ? 'var(--text-primary)' : 'var(--text-secondary)',
               fontSize: '0.78rem',
               fontWeight: 600,
               cursor: 'pointer',
@@ -177,7 +219,7 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
                     style={{ background: 'none', border: 'none' }}
                     className={`bookmark-icon ${item.is_favorite ? 'active' : ''}`}
                   >
-                    <Bookmark size={16} fill={item.is_favorite ? '#D6303F' : 'none'} />
+                    <Bookmark size={16} fill={item.is_favorite ? 'var(--color-red)' : 'none'} />
                   </button>
                 </div>
               </div>
@@ -185,6 +227,13 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
           ))
         )}
       </div>
+
+      {/* Flashcard Quiz Modal */}
+      <FlashcardQuizModal
+        isOpen={isQuizModalOpen}
+        onClose={() => setIsQuizModalOpen(false)}
+        errors={errors}
+      />
     </div>
   );
 };
