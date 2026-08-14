@@ -10,7 +10,7 @@ import { AddQuestionModal } from './components/AddQuestionModal';
 import { QuestionDetailModal } from './components/QuestionDetailModal';
 import { AuthModal } from './components/AuthModal';
 
-import { LoginView } from './components/LoginView';
+import { OnboardingView } from './components/OnboardingView';
 
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => authService.getCurrentUser());
@@ -88,9 +88,9 @@ export function App() {
     setIsAddModalOpen(true);
   };
 
-  // If no user is logged in, show direct Login / Registration screen
+  // If no user is logged in, show direct Onboarding & Login screen
   if (!currentUser) {
-    return <LoginView onSuccess={(user) => setCurrentUser(user)} />;
+    return <OnboardingView onSuccess={(user) => setCurrentUser(user)} />;
   }
 
   return (
