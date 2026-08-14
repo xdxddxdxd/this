@@ -9,7 +9,6 @@ import { BottomNav } from './components/BottomNav';
 import { AddQuestionModal } from './components/AddQuestionModal';
 import { QuestionDetailModal } from './components/QuestionDetailModal';
 import { AuthModal } from './components/AuthModal';
-
 import { OnboardingView } from './components/OnboardingView';
 
 export function App() {
@@ -17,6 +16,21 @@ export function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'errors' | 'profile'>('dashboard');
   const [errors, setErrors] = useState<UserError[]>([]);
   const [isLoadingErrors, setIsLoadingErrors] = useState(true);
+
+  // Black & White Theme State (Persisted in localStorage)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('tdk_theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('tdk_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -90,7 +104,13 @@ export function App() {
 
   // If no user is logged in, show direct Onboarding & Login screen
   if (!currentUser) {
-    return <OnboardingView onSuccess={(user) => setCurrentUser(user)} />;
+    return (
+      <OnboardingView
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onSuccess={(user) => setCurrentUser(user)}
+      />
+    );
   }
 
   return (
@@ -101,6 +121,8 @@ export function App() {
           <Dashboard
             user={currentUser}
             errors={errors}
+            theme={theme}
+            onToggleTheme={toggleTheme}
             onOpenAddModal={handleOpenAdd}
             onSelectError={(err) => setSelectedError(err)}
             onViewAllErrors={() => setActiveTab('errors')}
@@ -122,6 +144,8 @@ export function App() {
           <Profile
             user={currentUser}
             errors={errors}
+            theme={theme}
+            onToggleTheme={toggleTheme}
             onLogout={() => {
               authService.logout();
               setCurrentUser(null);

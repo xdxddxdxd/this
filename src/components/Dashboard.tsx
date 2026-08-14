@@ -1,11 +1,13 @@
 import React from 'react';
-import { Bookmark, PenLine, Type, Camera, ChevronRight, Edit } from 'lucide-react';
+import { Bookmark, PenLine, Type, Camera, ChevronRight, Edit, Moon, Sun } from 'lucide-react';
 import { User, UserError } from '../types';
 import { errorService } from '../services/errorService';
 
 interface DashboardProps {
   user: User;
   errors: UserError[];
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
   onOpenAddModal: (mode: 'text' | 'photo') => void;
   onSelectError: (error: UserError) => void;
   onViewAllErrors: () => void;
@@ -15,6 +17,8 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({
   user,
   errors,
+  theme = 'dark',
+  onToggleTheme,
   onOpenAddModal,
   onSelectError,
   onViewAllErrors,
@@ -33,10 +37,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  // Helper to render the red pen correction preview inside a card
   const renderCardSnippet = (item: UserError) => {
     const wrongWord = item.wrong_word;
     const correctWord = item.correct_word;
 
+    // Pick first option text or fallback to question text
     let targetText = item.question_text;
     if (item.options && item.wrong_option && item.options[item.wrong_option]) {
       targetText = item.options[item.wrong_option]!;
@@ -44,29 +50,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
       targetText = Object.values(item.options)[0] || item.question_text;
     }
 
-    const lowerTarget = targetText.toLowerCase();
-    const lowerWrong = wrongWord.toLowerCase();
+    const lowerTarget = targetText.toLocaleLowerCase('tr-TR');
+    const lowerWrong = wrongWord.toLocaleLowerCase('tr-TR');
     const idx = lowerTarget.indexOf(lowerWrong);
 
     if (idx === -1) {
       return (
         <div className="snippet-text">
-          <div style={{ lineHeight: 1.8 }}>
-            <span
-              style={{
-                fontFamily: 'var(--font-handwriting)',
-                color: 'var(--color-red)',
-                fontSize: '1.25rem',
-                fontWeight: 700,
-                display: 'block',
-                lineHeight: 1,
-                marginBottom: '-4px',
-                textAlign: 'left'
-              }}
-            >
-              {correctWord} <span className="correction-caret">^</span>
-            </span>
-            <span className="struck-word">{wrongWord}</span> {targetText}
+          <div style={{ lineHeight: 1.7 }}>
+            <del className="struck-word">{wrongWord}</del>
+            <span className="correction-badge-inline">
+              <span className="caret-arrow">^</span>
+              <span>{correctWord}</span>
+            </span>{' '}
+            <span>{targetText}</span>
           </div>
         </div>
       );
@@ -78,26 +75,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     return (
       <div className="snippet-text">
-        <div style={{ lineHeight: 1.8 }}>
+        <div style={{ lineHeight: 1.7 }}>
           {before}
-          <span style={{ display: 'inline-block', position: 'relative' }}>
-            <span
-              style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: '50%',
-                transform: 'translateX(-50%) rotate(-2deg)',
-                whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-handwriting)',
-                color: 'var(--color-red)',
-                fontSize: '1.25rem',
-                fontWeight: 700,
-                lineHeight: 1
-              }}
-            >
-              {correctWord} <span style={{ display: 'block', fontSize: '0.8rem', textAlign: 'center', lineHeight: 0.5 }}>^</span>
-            </span>
-            <span className="struck-word">{matched}</span>
+          <del className="struck-word">{matched}</del>
+          <span className="correction-badge-inline">
+            <span className="caret-arrow">^</span>
+            <span>{correctWord}</span>
           </span>
           {after}
         </div>
@@ -107,21 +90,49 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingBottom: '30px' }}>
+      {/* 1. Header (Greeting + Notebook Counter & Theme Switcher) */}
       <header className="top-header">
         <div>
-          <h1 className="greeting-title">
-            Merhaba, {user.full_name || 'Öğrenci'} <span className="red-dot" />
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 className="greeting-title">
+              Merhaba, {user.full_name || 'Öğrenci'} <span className="red-dot" />
+            </h1>
+          </div>
           <p className="greeting-subtitle">Bugün biraz daha iyi yazalım.</p>
         </div>
 
-        <div className="stat-counter-card">
-          <div className="stat-label-top">Toplam Kayıtlı Hata</div>
-          <div className="stat-number">{totalCount}</div>
-          <div className="stat-label-bottom">kelime</div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+          {/* Notebook Counter Card */}
+          <div className="stat-counter-card">
+            <div className="stat-label-top">Toplam Kayıtlı Hata</div>
+            <div className="stat-number">{totalCount}</div>
+            <div className="stat-label-bottom">kelime</div>
+          </div>
+
+          {/* Quick Theme Toggle Button */}
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className="theme-toggle-btn"
+              title={theme === 'dark' ? 'Aydınlık Siyah-Beyaz Moduna Geç' : 'Karanlık Siyah-Beyaz Moduna Geç'}
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun size={13} style={{ color: '#FFD166' }} />
+                  <span>Aydınlık</span>
+                </>
+              ) : (
+                <>
+                  <Moon size={13} />
+                  <span>Karanlık</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </header>
 
+      {/* 2. Central "Soru Ekle" Box */}
       <section className="add-question-box">
         <div className="add-question-header">
           <div className="add-question-info">
@@ -134,6 +145,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </p>
           </div>
 
+          {/* Big Red Hand-Drawn Circle Button */}
           <button
             className="hand-drawn-circle-btn"
             onClick={() => onOpenAddModal('text')}
@@ -145,7 +157,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 cy="30"
                 r="26"
                 fill="none"
-                stroke="#D6303F"
+                stroke="var(--color-red)"
                 strokeWidth="2.8"
                 strokeDasharray="140 10"
                 transform="rotate(-15 30 30)"
@@ -155,6 +167,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
 
+        {/* Two Quick Action Buttons */}
         <div className="add-actions-row">
           <button className="action-sub-btn" onClick={() => onOpenAddModal('text')}>
             <div className="btn-icon-wrapper">
@@ -178,6 +191,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </section>
 
+      {/* 3. Monthly Highlight Banner */}
       <div className="monthly-highlight">
         <span>📌</span>
         <span>
@@ -185,6 +199,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </span>
       </div>
 
+      {/* 4. Section: Son Eklenen Hatalar */}
       <section>
         <div className="section-header">
           <h3 className="section-title">Son Eklenen Hatalar</h3>
@@ -198,6 +213,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
 
+        {/* Error Cards List */}
         <div className="error-cards-list">
           {recentErrors.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)' }}>
@@ -227,7 +243,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       style={{ background: 'none', border: 'none' }}
                       className={`bookmark-icon ${item.is_favorite ? 'active' : ''}`}
                     >
-                      <Bookmark size={16} fill={item.is_favorite ? '#D6303F' : 'none'} />
+                      <Bookmark size={16} fill={item.is_favorite ? 'var(--color-red)' : 'none'} />
                     </button>
                   </div>
                 </div>

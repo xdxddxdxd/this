@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
-import { Camera, BookOpen, CheckCircle2, UserPlus, LogIn, TrendingUp, Target, HelpCircle } from 'lucide-react';
+import { Camera, BookOpen, UserPlus, LogIn, Target, Moon, Sun } from 'lucide-react';
 import { authService } from '../services/authService';
 import { User } from '../types';
 
 interface OnboardingViewProps {
   onSuccess: (user: User) => void;
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
 }
 
-export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess }) => {
+export const OnboardingView: React.FC<OnboardingViewProps> = ({
+  onSuccess,
+  theme = 'dark',
+  onToggleTheme
+}) => {
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
@@ -50,10 +56,33 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess }) => 
   };
 
   return (
-    <div style={{ minHeight: '100vh', padding: '28px 16px 60px 16px', maxWidth: '520px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+    <div style={{ minHeight: '100vh', padding: '24px 16px 60px 16px', maxWidth: '520px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
+      {/* 0. Top Bar Theme Switcher */}
+      {onToggleTheme && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onToggleTheme}
+            className="theme-toggle-btn"
+            title={theme === 'dark' ? 'Aydınlık Siyah-Beyaz Moduna Geç' : 'Karanlık Siyah-Beyaz Moduna Geç'}
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun size={13} style={{ color: '#FFD166' }} />
+                <span>Aydınlık Mod</span>
+              </>
+            ) : (
+              <>
+                <Moon size={13} />
+                <span>Karanlık Mod</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* 1. HERO SECTION */}
-      <div style={{ textAlign: 'center', paddingTop: '8px' }}>
+      <div style={{ textAlign: 'center', paddingTop: '4px' }}>
         <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.3rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.15, letterSpacing: '-0.02em', margin: '0 0 10px 0' }}>
           TDK Projesi <span className="red-dot" />
         </h1>
@@ -93,7 +122,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess }) => 
         </h3>
 
         {/* Step 1 */}
-        <div style={{ display: 'flex', gap: '14px', background: '#FFFFFF', padding: '16px', borderRadius: '14px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: '14px', background: 'var(--bg-card)', padding: '16px', borderRadius: '14px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', alignItems: 'flex-start' }}>
           <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'var(--color-red-light)', color: 'var(--color-red)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
             <Camera size={22} />
           </div>
@@ -108,8 +137,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess }) => 
         </div>
 
         {/* Step 2 */}
-        <div style={{ display: 'flex', gap: '14px', background: '#FFFFFF', padding: '16px', borderRadius: '14px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', alignItems: 'flex-start' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'var(--color-green-light)', color: 'var(--color-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+        <div style={{ display: 'flex', gap: '14px', background: 'var(--bg-card)', padding: '16px', borderRadius: '14px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', alignItems: 'flex-start' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'var(--color-green-light)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
             <BookOpen size={22} />
           </div>
           <div>
@@ -123,8 +152,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess }) => 
         </div>
 
         {/* Step 3 */}
-        <div style={{ display: 'flex', gap: '14px', background: '#FFFFFF', padding: '16px', borderRadius: '14px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', alignItems: 'flex-start' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F4F0E8', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+        <div style={{ display: 'flex', gap: '14px', background: 'var(--bg-card)', padding: '16px', borderRadius: '14px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', alignItems: 'flex-start' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'var(--bg-card-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
             <Target size={22} />
           </div>
           <div>
@@ -189,7 +218,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess }) => 
                 padding: '8px',
                 borderRadius: '8px',
                 border: 'none',
-                background: !isRegister ? '#FFFFFF' : 'transparent',
+                background: !isRegister ? 'var(--bg-card)' : 'transparent',
                 fontWeight: 700,
                 fontSize: '0.85rem',
                 color: !isRegister ? 'var(--color-red)' : 'var(--text-muted)',
@@ -210,7 +239,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSuccess }) => 
                 padding: '8px',
                 borderRadius: '8px',
                 border: 'none',
-                background: isRegister ? '#FFFFFF' : 'transparent',
+                background: isRegister ? 'var(--bg-card)' : 'transparent',
                 fontWeight: 700,
                 fontSize: '0.85rem',
                 color: isRegister ? 'var(--color-red)' : 'var(--text-muted)',
