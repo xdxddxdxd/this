@@ -25,66 +25,58 @@ export const groqService = {
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
           response_format: { type: 'json_object' },
-          temperature: 0.05,
+          temperature: 0.0,
           messages: [
             {
               role: 'system',
-              content: `Sen Türkiye TYT/ÖSYM Türkçe sınavları ve Türk Dil Kurumu (TDK) Yazım Kılavuzu konusunda en üst düzey uzmansın.
-Görevin sana verilen soruyu/metni A'dan E'ye tüm şıklarıyla harf harf inceleyip yazım yanlışı olan şıkkı, hatalı kelimeyi ve TDK doğrusunu %100 doğrulukla bulmaktır.
+              content: `Sen Türk Dil Kurumu (TDK) Yazım Kılavuzu ve ÖSYM Türkiye YKS/TYT Türkçe sınavları başuzmanısın.
 
-ÖNEMLİ TDK KURALLARI REHBERİ:
-1. YARDIMCI FİİLLER (etmek, olmak, eylemek, kılmak):
-   - Ses düşmesi (ünlü düşmesi) veya ses türemesi VARSA BİTİŞİK yazılır:
-     şükür+etti = şükretti (DOĞRU)
-     sabır+etti = sabretti (DOĞRU)
-     azim+etti = azmetti (DOĞRU)
-     zehir+etti = zehretti (DOĞRU)
-     hapis+oldu = hapsoldu (DOĞRU)
-     af+etti = affetti (DOĞRU)
-     his+etti = hissetti (DOĞRU)
-     kayıp+etti = kaybetti (DOĞRU)
-   - Ses olayı (düşme veya türeme) YOKSA MUTLAKA AYRI yazılır:
-     ayırt etmek -> ayırtetmek YANLIŞTIR! "ayırt etmek" DOĞRUDUR.
-     fark etmek -> farketmek YANLIŞTIR! "fark etmek" DOĞRUDUR.
-     terk etmek -> terketmek YANLIŞTIR! "terk etmek" DOĞRUDUR.
-     arz etmek -> arzetmek YANLIŞTIR! "arz etmek" DOĞRUDUR.
-     sağ olmak -> sağolmak YANLIŞTIR! "sağ olmak" DOĞRUDUR.
+GÖREVİN:
+Sana verilen soruda A, B, C, D, E seçeneklerini harf harf inceleyip yazım yanlışı olan tek şıkkı, hatalı kelimeyi ve TDK doğrusunu %100 doğrulukla bulmaktır.
 
-2. BAĞLAÇ OLAN "DE / DA" vs BULUNMA HALİ EKİ "-DE / -DA":
-   - Cümleden çıkarıldığında cümlenin yapısı bozulmuyorsa bağlaçtır ve AYRI yazılır.
-     "yarında size geliriz" YANLIŞTIR! Doğrusu: "yarın da size geliriz".
-     "Nasıl oldu da" DOĞRUDUR.
+ÖSYM VE TDK TEST KURALLARI REHBERİ:
+1. KURUM, KURULUŞ, MERKEZ VE ÜNİVERSİTE EKLERİ:
+   - Kesme işaretiyle ASLA AYRILMAZ:
+     "Ankara Üniversitesi'nin" YANLIŞTIR -> Doğrusu: "Ankara Üniversitesinin"
+     "Türk Dil Kurumu'na" YANLIŞTIR -> Doğrusu: "Türk Dil Kurumuna"
+     "Boğaziçi Üniversitesi'ne" YANLIŞTIR -> Doğrusu: "Boğaziçi Üniversitesine"
+     "Bakanlar Kurulu'nun" YANLIŞTIR -> Doğrusu: "Bakanlar Kurulunun"
 
-3. BAĞLAÇ OLAN "Kİ" vs SIFAT/İLGİ EKİ "-Kİ":
-   - Fiillerden sonra gelen ki bağlaçtır ve ayrı yazılır ("fark etmedi ki").
-   - Zaman veya yer bildiren sıfat yapan -ki bitişik yazılır ("yarınki", "evdeki", "akşamki").
+2. BELGİSİZ SIFAT "BİRTAKIM":
+   - "Bazı" anlamındaysa MUTLAKA BİTİŞİK: "birtakım sorunlar" (bir takım sorunlar YANLIŞTIR), "birtakım insanlar".
+   - Sayı olarak takım belirtiyorsa AYRI: "bir takım elbise", "bir takım mobilya".
 
-4. ÜNLÜ DARALMASI KURALLARI:
-   - Sadece şimdiki zaman eki "-yor" (ve demek/yemek fiillerinde bazı ekler) daralma yapar.
-   - "-yor" eki olmadan geniş zaman veya -me/-ma olumsuzluk ekinde gereksiz daralma yazım yanlışıdır:
-     "kanıtlıyamadı" YANLIŞTIR! Doğrusu: "kanıtlayamadı".
-     "anlamıyan" YANLIŞTIR! Doğrusu: "anlamayan".
+3. YARDIMCI FİİLLER (etmek, olmak, eylemek, kılmak):
+   - Ses olayı (düşme/türeme) yoksa MUTLAKA AYRI:
+     "arz etmek" -> arzetti YANLIŞTIR! "arz etti" DOĞRUDUR.
+     "fark etmek" -> farketti YANLIŞTIR! "fark etti" DOĞRUDUR.
+     "terk etmek" -> terkatmek YANLIŞTIR! "terk etti" DOĞRUDUR.
+     "ayırt etmek" -> ayırtetmek YANLIŞTIR! "ayırt etmek" DOĞRUDUR.
+     "hak etmek" -> haketti YANLIŞTIR! "hak etti" DOĞRUDUR.
+   - Ses olayı (ünlü düşmesi / ünsüz türemesi) varsa BİTİŞİK:
+     şükretti, sabretti, azmetti, zehretti, hapsoldu, affetti, hissetti, kaybetti.
 
-5. ÜNSÜZ BENZEŞMESİ (SERTLEŞME):
-   - Sert ünsüzlerden (f, s, t, k, ç, ş, h, p) sonra gelen ekler sertleşir:
-     "değişgenlik" YANLIŞTIR! Doğrusu: "değişkenlik".
-     "1923'de" YANLIŞTIR! Doğrusu: "1923'te".
+4. BÜYÜK HARFLER, UNVANLAR, GAZETE VE DERGİ:
+   - Özel ada bağlı unvan ve saygı sözcükleri BÜYÜKTÜR: "Doç. Dr. Ali Bey'in" TAMAMEN DOĞRUDUR.
+   - "Resmi Gazete" DOĞRUDUR (kendi adında gazete geçer).
+   - Özel ada dahil olmayan "dergi, gazete, tablo" sözleri KÜÇÜK harfle başlar: "Türk Dili dergisi" (dergi d küçük).
+   - Belirli bir tarih bildirmeyen gün adları KÜÇÜKTÜR: "önümüzdeki salı günü" (salı s küçük, DOĞRU).
 
-6. YABANCI KÖKENLİ SÖZCÜKLERİN YAZIMI:
-   - "Antırenör" YANLIŞTIR! Doğrusu: "Antrenör".
-   - "Kirpik" DOĞRUDUR ("kiprik" yanlıştır), "Kibrit" DOĞRUDUR.
-   - "Laboratuvar" DOĞRUDUR ("laboratuar" yanlıştır), "Orijinal" DOĞRUDUR ("orjinal" yanlıştır).
+5. RENK ADIYLA KURULAN YİYECEK VE BİTKİ ADLARI:
+   - TDK güncel kılavuzunda "yeşil biber", "kırmızı biber", "sivri biber", "kuru fasulye" ayrıdır.
 
-ANALİZ ADIMLARI:
-- Verilen metinden soru kökünü ve A, B, C, D, E şıklarını çıkar.
-- Her şıkkı yukarıdaki TDK kurallarına göre tek tek kontrol et.
-- Sadece gerçekten yazım kuralı ihlali olan şıkkı "wrong_option" olarak seç.
-- Hatalı kelimeyi "wrong_word" (sorudaki yazılışı) ve "correct_word" (TDK doğrusu) olarak belirle.
-- "rule_category" alanını TYT kural gruplarından biri yap: 'Ayrı Yazılan Kelimeler', 'Bitişik Yazılan Kelimeler', 'de / da Bağlacı', 'ki Bağlacı', 'mi Soru Eki', 'Büyük Harflerin Yazımı', 'Sayıların Yazımı', 'İkilemelerin Yazımı', 'Ses Olaylarına Bağlı Yazım Kuralları', 'Yabancı Kökenli Kelimeler'.
-- "explanation": TDK kuralını ve hatanın nedenini net, kesin bir dille açıkla.
-- "coach_note": Öğrenciye rehberlik eden samimi, öğretici koç uyarısı yaz.
+6. BİTİŞİK YAZILAN KALIPLAŞMIŞ SÖZCÜKLER:
+   - "gitgide", "birdenbire", "akşamüstü", "akşamüzeri", "olağanüstü".
 
-SADECE ŞU JSON FORMATINDA CEVAP VER:
+7. AYRI YAZILANLAR:
+   - "çevrim içi" (AYRI), "çevrim dışı" (AYRI), "veri tabanı" (AYRI), "art arda" (AYRI), "her an" (AYRI), "hiçbir şey" (hiçbir bitişik, şey ayrı).
+
+ÖNEMLİ ŞARTLAR:
+- "wrong_word": Seçenekteki HATALI yazılmış kelime/ifade olmalıdır.
+- "correct_word": TDK'ye göre düzeltilmiş hali olmalıdır. ASLA wrong_word ile birebir aynı olamaz!
+- "wrong_option": A, B, C, D veya E olmalıdır.
+
+CEVAP FORMATI (SADECE GEÇERLİ JSON):
 {
   "question_text": "Soru metni",
   "options": {
@@ -94,18 +86,18 @@ SADECE ŞU JSON FORMATINDA CEVAP VER:
     "D": "D seçeneği metni",
     "E": "E seçeneği metni"
   },
-  "wrong_option": "A",
-  "wrong_word": "ayırtetmemizi",
-  "correct_word": "ayırt etmemizi",
+  "wrong_option": "C",
+  "wrong_word": "arzetti",
+  "correct_word": "arz etti",
   "rule_category": "Ayrı Yazılan Kelimeler",
-  "explanation": "'Etmek' yardımcı fiiliyle kurulan birleşik fiillerde ses düşmesi veya türemesi yoksa fiil ayrı yazılır. 'Ayırt etmek' sözcüğünde ses olayı olmadığı için ayrı yazılmalıdır.",
-  "coach_note": "Yardımcı eylemlerde ses olayı (düşme/türeme) yoksa her zaman ayrı yazılır. Bu kural TYT'de çok sık sorulur!",
+  "explanation": "Yardımcı fiillerde ses düşmesi veya türemesi yoksa sözcükler ayrı yazılır. 'Arz etmek' ses olayı içermediği için ayrı yazılmalıdır.",
+  "coach_note": "TYT Türkçe sınavında yardımcı eylemlerin yazımı sıklıkla test edilir.",
   "difficulty_score": 6
 }`
             },
             {
               role: 'user',
-              content: `Lütfen bu soruyu dikkatle analiz et:\n"""\n${trimmed}\n"""`
+              content: `Lütfen bu soruyu dikkatle analiz et ve yazım yanlışı olan şıkkı, hatalı kelimeyi ve doğrusunu tespit et:\n"""\n${trimmed}\n"""`
             }
           ]
         })
@@ -128,13 +120,27 @@ SADECE ŞU JSON FORMATINDA CEVAP VER:
         parsed.correct_word = parsed.correct_word.replace(/^[\.,:;"'“”‘’\(\)]+|[\.,:;"'“”‘’\(\)]+$/g, '').trim();
       }
 
+      // Check if wrong_word equals correct_word or is empty -> trigger fallback fixer
+      if (
+        !parsed.wrong_word ||
+        !parsed.correct_word ||
+        parsed.wrong_word.toLocaleLowerCase('tr-TR') === parsed.correct_word.toLocaleLowerCase('tr-TR')
+      ) {
+        const fixed = this.applyLocalRuleInspection(parsed, trimmed);
+        parsed.wrong_option = fixed.wrong_option;
+        parsed.wrong_word = fixed.wrong_word;
+        parsed.correct_word = fixed.correct_word;
+        parsed.rule_category = fixed.rule_category;
+        parsed.explanation = fixed.explanation;
+      }
+
       // Cross-verify with TDK service
       const tdkCheck = await tdkService.verifyWithTdk(parsed.wrong_word || parsed.correct_word);
       if (tdkCheck.isValid && tdkCheck.correctForm) {
         parsed.correct_word = tdkCheck.correctForm;
       }
 
-      // Check recurring error patterns for this user
+      // Coach note personalization
       const sameWordCount = existingUserErrors.filter(
         e => (e.wrong_word || '').toLocaleLowerCase('tr-TR') === (parsed.wrong_word || '').toLocaleLowerCase('tr-TR')
       ).length;
@@ -153,7 +159,71 @@ SADECE ŞU JSON FORMATINDA CEVAP VER:
     }
   },
 
-  localFallback(text: string, existingUserErrors: UserError[]): AnalysisResult {
+  applyLocalRuleInspection(result: Partial<AnalysisResult>, _rawText: string) {
+    const options = result.options || {};
+
+    // 1. Kurum / Üniversite kesme işareti kontrolü
+    for (const [key, optText] of Object.entries(options)) {
+      if (!optText) continue;
+      const match = optText.match(/([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*\s+(?:Üniversitesi|Kurumu|Bakanlığı|Müdürlüğü|Fakültesi|Enstitüsü))'([a-zçğıöşü]+)/i);
+      if (match) {
+        return {
+          wrong_option: key,
+          wrong_word: `${match[1]}'${match[2]}`,
+          correct_word: `${match[1]}${match[2]}`,
+          rule_category: "Kesme İşaretinin Kullanımı",
+          explanation: "Kurum, kuruluş, kurul, merkez, bakanlık ve üniversite adlarına gelen ekler kesme işaretiyle ayrılmaz."
+        };
+      }
+    }
+
+    // 2. Belgisiz sıfat "bir takım" -> "birtakım"
+    for (const [key, optText] of Object.entries(options)) {
+      if (!optText) continue;
+      if (/\bbir\s+takım\s+(?:sorun|insan|kural|olay|durum|şey|sebep|neden)/i.test(optText)) {
+        return {
+          wrong_option: key,
+          wrong_word: "bir takım",
+          correct_word: "birtakım",
+          rule_category: "Bitişik Yazılan Kelimeler",
+          explanation: "'Birtakım' sözcüğü 'bazı' anlamında belgisiz sıfat olarak kullanıldığında bitişik yazılır."
+        };
+      }
+    }
+
+    // 3. Yardımcı fiiller
+    for (const [key, optText] of Object.entries(options)) {
+      if (!optText) continue;
+      const wrongVerbs = [
+        { wrong: 'arzetti', correct: 'arz etti' },
+        { wrong: 'farketti', correct: 'fark etti' },
+        { wrong: 'terketti', correct: 'terk etti' },
+        { wrong: 'ayırtetmemizi', correct: 'ayırt etmemizi' },
+        { wrong: 'haketti', correct: 'hak etti' }
+      ];
+      for (const v of wrongVerbs) {
+        if (optText.toLocaleLowerCase('tr-TR').includes(v.wrong)) {
+          return {
+            wrong_option: key,
+            wrong_word: v.wrong,
+            correct_word: v.correct,
+            rule_category: "Ayrı Yazılan Kelimeler",
+            explanation: "Yardımcı fiillerde ses olayı (düşme veya türeme) yoksa sözcükler ayrı yazılır."
+          };
+        }
+      }
+    }
+
+    return {
+      wrong_option: result.wrong_option || "A",
+      wrong_word: result.wrong_word || "hatalı sözcük",
+      correct_word: result.correct_word || "doğru sözcük",
+      rule_category: result.rule_category || "Yazım Kuralları",
+      explanation: result.explanation || "TDK kurallarına göre bu sözcüğün yazımı yanlıştır."
+    };
+  },
+
+  localFallback(text: string, _existingUserErrors: UserError[]): AnalysisResult {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const options: QuestionOptions = {};
     let questionText = "Aşağıdaki cümlelerin hangisinde bir yazım yanlışı vardır?";
@@ -198,29 +268,16 @@ SADECE ŞU JSON FORMATINDA CEVAP VER:
       if (found) break;
     }
 
-    if (!found && detected.length === 0) {
-      const lower = text.toLocaleLowerCase('tr-TR');
-      for (const [_, record] of Object.entries(TDK_DICTIONARY)) {
-        if (lower.includes(record.wrong.toLocaleLowerCase('tr-TR'))) {
-          wrongWord = record.wrong;
-          correctWord = record.correct;
-          ruleCategory = record.category;
-          explanation = record.explanation;
-          break;
-        }
-      }
-      options['A'] = text;
-      wrongOption = 'A';
-    }
+    const inspected = this.applyLocalRuleInspection({ options, wrong_option: wrongOption, wrong_word: wrongWord, correct_word: correctWord, rule_category: ruleCategory, explanation }, text);
 
     return {
       question_text: questionText,
       options: Object.keys(options).length > 0 ? options : { A: text },
-      wrong_option: wrongOption,
-      wrong_word: wrongWord,
-      correct_word: correctWord,
-      rule_category: ruleCategory,
-      explanation,
+      wrong_option: inspected.wrong_option,
+      wrong_word: inspected.wrong_word,
+      correct_word: inspected.correct_word,
+      rule_category: inspected.rule_category,
+      explanation: inspected.explanation,
       coach_note: "Yardımcı eylemlerde ses olayı (düşme/türeme) yoksa her zaman ayrı yazılır.",
       difficulty_score: 5
     };
