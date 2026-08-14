@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, Type, Sparkles, Check, ArrowRight, ArrowLeft, BookOpen, Layers } from 'lucide-react';
+import { X, Camera, Type, Sparkles, Check, ArrowRight, ArrowLeft, Layers } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AnalysisResult, UserError } from '../types';
 import { geminiService } from '../services/geminiService';
@@ -98,30 +98,40 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
     setCurrentRule(GET_RANDOM_RULE());
 
     try {
+      let questions: string[] = [];
+
       if (mode === 'photo' && imagePreview) {
-        setLoadingProgressText('Fotoğraftaki soru ve şıklar okunuyor...');
-        const singleResult = await geminiService.analyzeImage(imagePreview, existingErrors);
-        setAnalyzedResults([singleResult]);
-        setActiveResultIndex(0);
-      } else {
-        // Multi-question batch splitting
-        const questions = splitQuestions(inputText);
-        if (questions.length === 1) {
-          setLoadingProgressText('Soru analiz ediliyor...');
-          const res = await groqService.analyzeTextWithLlama(questions[0], existingErrors);
-          setAnalyzedResults([res]);
-          setActiveResultIndex(0);
+        setLoadingProgressText('Fotoğraftaki soru ve şıklar taranıyor...');
+        const ocrText = await geminiService.extractTextFromImage(imagePreview);
+        if (ocrText && ocrText.trim()) {
+          questions = splitQuestions(ocrText);
         } else {
-          // Batch analyze each question sequentially
-          const batchResults: AnalysisResult[] = [];
-          for (let i = 0; i < questions.length; i++) {
-            setLoadingProgressText(`Soru ${i + 1} / ${questions.length} analiz ediliyor...`);
-            const res = await groqService.analyzeTextWithLlama(questions[i], existingErrors);
-            batchResults.push(res);
-          }
-          setAnalyzedResults(batchResults);
+          const fallbackRes = await geminiService.analyzeImage(imagePreview, existingErrors);
+          setAnalyzedResults([fallbackRes]);
           setActiveResultIndex(0);
+          return;
         }
+      } else {
+        questions = splitQuestions(inputText);
+      }
+
+      if (questions.length === 1) {
+        setLoadingProgressText('Soru analiz ediliyor...');
+        const res = await groqService.analyzeTextWithLlama(questions[0], existingErrors);
+        setAnalyzedResults([res]);
+        setActiveResultIndex(0);
+      } else if (questions.length > 1) {
+        const batchResults: AnalysisResult[] = [];
+        for (let i = 0; i < questions.length; i++) {
+          setLoadingProgressText(`Soru ${i + 1} / ${questions.length} analiz ediliyor...`);
+          const res = await groqService.analyzeTextWithLlama(questions[i], existingErrors);
+          batchResults.push(res);
+          if (i + 1 < questions.length) {
+            await new Promise(r => setTimeout(r, 400));
+          }
+        }
+        setAnalyzedResults(batchResults);
+        setActiveResultIndex(0);
       }
     } catch (err) {
       console.error('Analysis error:', err);
