@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Bookmark, Plus, Award, Sparkles } from 'lucide-react';
+import { Search, Bookmark, Plus, Award, Sparkles, Sliders } from 'lucide-react';
 import { UserError } from '../types';
-import { FlashcardQuizModal } from './FlashcardQuizModal';
+import { CustomQuizModal } from './CustomQuizModal';
 
 interface MyErrorsProps {
   errors: UserError[];
@@ -78,7 +78,7 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
         </button>
       </div>
 
-      {/* 🎯 "Hatalarımı Tekrar Et" (Quiz / Flashcard Alıştırma Butonu) */}
+      {/* 🎯 "Kişiselleştirilmiş Sınav Oluştur" (Zorluk, Süre, Konu ve Soru Sayısı Ayarlı) */}
       {errors.length > 0 && (
         <div
           onClick={() => setIsQuizModalOpen(true)}
@@ -102,19 +102,19 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                Hatalarımı Tekrar Et (Quiz Modu)
+                Özel Hata Tekrar Sınavı Oluştur
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Havuzundaki {errors.length} sorudan kendini test et
+                Zorluk, süre, konu ve soru sayısını sen belirle
               </div>
             </div>
           </div>
 
           <button
             className="btn-primary"
-            style={{ padding: '8px 14px', fontSize: '0.8rem', pointerEvents: 'none' }}
+            style={{ padding: '8px 14px', fontSize: '0.8rem', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <Sparkles size={14} /> Başla
+            <Sliders size={14} /> Yapılandır
           </button>
         </div>
       )}
@@ -228,8 +228,8 @@ export const MyErrors: React.FC<MyErrorsProps> = ({
         )}
       </div>
 
-      {/* Flashcard Quiz Modal */}
-      <FlashcardQuizModal
+      {/* Custom Configurable Quiz Modal */}
+      <CustomQuizModal
         isOpen={isQuizModalOpen}
         onClose={() => setIsQuizModalOpen(false)}
         errors={errors}
