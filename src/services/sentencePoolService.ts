@@ -21,7 +21,7 @@ export const sentencePoolService = {
    * Ingests newly generated AI questions into the sentence pool (both clean distractors and error sentences)
    */
   async ingestQuestions(questions: DynamicQuizQuestion[], userId?: string): Promise<void> {
-    if (!questions || questions.length === 0) return;
+    if (!questions || questions.length === 0 || !userId) return;
 
     const rowsToInsert: {
       sentence_text: string;
@@ -31,6 +31,7 @@ export const sentencePoolService = {
       rule_category: string;
       explanation?: string;
       coach_note?: string;
+      owner_id: string;
     }[] = [];
 
     questions.forEach((q) => {
@@ -44,6 +45,7 @@ export const sentencePoolService = {
         if (k === wrongKey) {
           // Erroneous sentence
           rowsToInsert.push({
+            owner_id: userId,
             sentence_text: sentenceText,
             has_error: true,
             wrong_word: q.wrong_word,
@@ -55,6 +57,7 @@ export const sentencePoolService = {
         } else {
           // Clean distractor sentence
           rowsToInsert.push({
+            owner_id: userId,
             sentence_text: sentenceText,
             has_error: false,
             rule_category: q.rule_category
@@ -66,7 +69,8 @@ export const sentencePoolService = {
     // 1. Supabase Persistence
     if (isSupabaseConfigured) {
       try {
-        await supabase.from('sentence_pool').insert(rowsToInsert);
+        const { error } = await supabase.from('sentence_pool').upsert(rowsToInsert, { onConflict: 'owner_id,sentence_text', ignoreDuplicates: true });
+        if (error) throw error;
       } catch (err) {
         console.warn('Sentence pool Supabase ingest skipped:', err);
       }
@@ -125,6 +129,7 @@ export const sentencePoolService = {
           .from('sentence_pool')
           .select('*')
           .eq('has_error', true)
+          .eq('owner_id', effectiveUserId)
           .limit(50);
 
         if (targetCategory && targetCategory !== 'Tümü') {
@@ -141,6 +146,7 @@ export const sentencePoolService = {
           .from('sentence_pool')
           .select('*')
           .eq('has_error', false)
+          .eq('owner_id', effectiveUserId)
           .limit(100);
 
         if (cleanRows) {
@@ -258,7 +264,8 @@ export const sentencePoolService = {
           seen_at: nowIso
         }));
         if (rows.length > 0) {
-          await supabase.from('user_sentence_history').insert(rows);
+          const { error } = await supabase.from('user_sentence_history').upsert(rows, { onConflict: 'user_id,sentence_id' });
+          if (error) throw error;
         }
       } catch (err) {
         console.warn('Supabase sentence history insert skipped:', err);
