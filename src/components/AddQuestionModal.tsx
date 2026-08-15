@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, Type, Sparkles, Check, ArrowRight, ArrowLeft, Layers } from 'lucide-react';
+import { X, Camera, Type, Sparkles, Check, ArrowRight, ArrowLeft, BookOpen, Layers } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AnalysisResult, UserError } from '../types';
 import { geminiService } from '../services/geminiService';
@@ -61,7 +61,6 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
           const maxDim = 1600;
           let width = img.width;
           let height = img.height;
-
           if (width > maxDim || height > maxDim) {
             if (width > height) {
               height = Math.round((height * maxDim) / width);
@@ -239,7 +238,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
                   padding: '9px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: mode === 'text' ? '#FFFFFF' : 'transparent',
+                  background: mode === 'text' ? 'var(--bg-card)' : 'transparent',
                   fontWeight: 600,
                   fontSize: '0.88rem',
                   color: mode === 'text' ? 'var(--text-primary)' : 'var(--text-muted)',
@@ -261,7 +260,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
                   padding: '9px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: mode === 'photo' ? '#FFFFFF' : 'transparent',
+                  background: mode === 'photo' ? 'var(--bg-card)' : 'transparent',
                   fontWeight: 600,
                   fontSize: '0.88rem',
                   color: mode === 'photo' ? 'var(--text-primary)' : 'var(--text-muted)',
@@ -280,7 +279,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
                     Soruları yapıştırın (Tek veya çoklu soru desteklenir):
                   </label>
                   {detectedQuestionsCount > 1 && (
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-green)', background: 'var(--color-green-light)', padding: '2px 8px', borderRadius: '10px', border: '1px solid var(--color-green-border)' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)', background: 'var(--color-green-light)', padding: '2px 8px', borderRadius: '10px', border: '1px solid var(--color-green-border)' }}>
                       <Layers size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '3px' }} />
                       {detectedQuestionsCount} Soru Algılandı
                     </span>
@@ -342,7 +341,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
                       padding: '36px 20px',
                       textAlign: 'center',
                       cursor: 'pointer',
-                      backgroundColor: '#FCFBF7'
+                      backgroundColor: 'var(--bg-card)'
                     }}
                   >
                     <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--color-red-light)', color: 'var(--color-red)', margin: '0 auto 12px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -389,7 +388,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
                       padding: '6px 12px',
                       borderRadius: '8px',
                       border: activeResultIndex === idx ? '1px solid var(--color-red)' : '1px solid var(--color-border)',
-                      background: activeResultIndex === idx ? 'var(--color-red-light)' : '#FFFFFF',
+                      background: activeResultIndex === idx ? 'var(--color-red-light)' : 'var(--bg-card)',
                       color: activeResultIndex === idx ? 'var(--color-red)' : 'var(--text-secondary)',
                       fontWeight: 700,
                       fontSize: '0.8rem',

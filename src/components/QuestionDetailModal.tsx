@@ -40,6 +40,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
     setIsEditing(false);
   };
 
+  // Helper to render option text with red pen correction
   const renderOptionContent = (optKey: string, optText: string) => {
     const isWrong = errorItem.wrong_option?.toUpperCase() === optKey.toUpperCase();
     
@@ -50,7 +51,8 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
     const wrongWord = errorItem.wrong_word;
     const correctWord = errorItem.correct_word;
 
-    const idx = optText.toLowerCase().indexOf(wrongWord.toLowerCase());
+    // Check if wrong word is in this option text (Turkish locale aware)
+    const idx = optText.toLocaleLowerCase('tr-TR').indexOf(wrongWord.toLocaleLowerCase('tr-TR'));
     if (idx === -1) {
       return (
         <span className="wrong-choice-container">
@@ -67,28 +69,12 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
     const after = optText.substring(idx + wrongWord.length);
 
     return (
-      <span>
+      <span style={{ lineHeight: 1.8 }}>
         {before}
-        <span className="wrong-choice-container" style={{ display: 'inline-block', position: 'relative' }}>
-          <span
-            style={{
-              position: 'absolute',
-              bottom: '100%',
-              left: '50%',
-              transform: 'translateX(-50%) rotate(-2deg)',
-              whiteSpace: 'nowrap',
-              fontFamily: 'var(--font-handwriting)',
-              color: 'var(--color-red)',
-              fontSize: '1.35rem',
-              fontWeight: 700,
-              lineHeight: 1
-            }}
-          >
-            {correctWord} <span style={{ display: 'block', fontSize: '0.85rem', textAlign: 'center', lineHeight: 0.6 }}>^</span>
-          </span>
-          <span className="struck-word" style={{ textDecoration: 'line-through', textDecorationColor: 'var(--color-red)', textDecorationThickness: '2px' }}>
-            {matched}
-          </span>
+        <del className="struck-word">{matched}</del>
+        <span className="correction-badge-inline">
+          <span className="caret-arrow">^</span>
+          <span>{correctWord}</span>
         </span>
         {after}
       </span>
@@ -101,6 +87,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        {/* Top Header */}
         <div className="detail-header">
           <button className="back-btn" onClick={onClose} aria-label="Geri Dön">
             <ArrowLeft size={22} />
@@ -108,7 +95,9 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
           <span className="detail-date">{formatDate(errorItem.created_at)}</span>
         </div>
 
+        {/* Content Body */}
         <div className="detail-body">
+          {/* Exam Paper Card */}
           <div className="exam-paper-card">
             <div className="card-watermark-quote">“</div>
             <div className="question-stem">{errorItem.question_text}</div>
@@ -160,6 +149,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
             )}
           </div>
 
+          {/* Edit Form Mode */}
           {isEditing ? (
             <div className="rule-explanation-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <h4 className="rule-card-title">Kaydı Düzenle</h4>
@@ -208,12 +198,14 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
             </div>
           ) : (
             <>
+              {/* Yazım Kuralı Card */}
               <div className="rule-explanation-card">
                 <div className="rule-card-title">Yazım Kuralı</div>
                 <div className="rule-badge">{errorItem.rule_category}</div>
                 <div className="rule-explanation-text">{errorItem.explanation}</div>
               </div>
 
+              {/* Sana Özel Not Card */}
               {errorItem.coach_note && (
                 <div className="coach-note-card">
                   <div className="coach-note-header">Sana Özel Not</div>
@@ -227,6 +219,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
           )}
         </div>
 
+        {/* Bottom Actions Bar */}
         <div className="detail-bottom-actions">
           <button className="detail-action-btn" onClick={() => setIsEditing(!isEditing)}>
             <Edit3 size={18} />

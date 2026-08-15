@@ -45,13 +45,13 @@ Verilen soruyu A'dan E'ye tüm seçenekleriyle harf harf inceleyip yazım yanlı
    - "yeşil zeytin", "kuru fasulye", "yeşil biber" AYRI yazılır.
 
 10. "ALTÜST" SÖZCÜĞÜ:
-   - "altüst etmek", "altüst olmak" BİTİŞİK yazılır.
+    - "altüst etmek", "altüst olmak" BİTİŞİK yazılır.
 
 11. BAĞLAÇ OLAN "DA / DE":
-   - Cümleden çıkarıldığında anlam bozulmayan bağlaç "da / de" her zaman AYRI yazılır: "dosyanı da yanında götür", "ben de geleceğim". ("dosyanıda" YANLIŞTIR).
+    - Cümleden çıkarıldığında anlam bozulmayan bağlaç "da / de" her zaman AYRI yazılır: "dosyanı da yanında götür", "ben de geleceğim". ("dosyanıda" YANLIŞTIR).
 
 12. ÖZEL VE KALIPLAŞMIŞ SÖZCÜKLER:
-   - "pek çok" (AYRI), "hiç kimse" (AYRI), "bir gün" (AYRI), "birkaç" (BİTİŞİK), "hiçbir" (BİTİŞİK), "bugün" (BİTİŞİK).
+    - "pek çok" (AYRI), "hiç kimse" (AYRI), "bir gün" (AYRI), "birkaç" (BİTİŞİK), "hiçbir" (BİTİŞİK), "bugün" (BİTİŞİK).
 
 STANDART TYT KURAL KATEGORİLERİ (rule_category alanı sadece bu standart başlıklardan biri olmalıdır):
 - "Büyük Harflerin Yazımı" (Ülke, devlet, kişi, kurum, gezegen, özel adlar ve unvanlar için)
@@ -86,7 +86,8 @@ JSON FORMATI:
   "explanation": "TDK kurallarına göre devlet ve ülke adlarını oluşturan tüm sözcükler büyük harfle başlar.",
   "coach_note": "Ülke ve devlet adlarının yazımı TYT'de sıkça sorulur.",
   "difficulty_score": 6
-}`;
+}
+`;
 
 export const groqService = {
   async analyzeTextWithLlama(
@@ -167,9 +168,9 @@ export const groqService = {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
         'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'TDK TYT Projesi'
+        'X-Title': 'TDK TYT Master',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'meta-llama/llama-3.3-70b-instruct',
@@ -195,100 +196,161 @@ export const groqService = {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.0 }
+      generationConfig: { responseMimeType: 'application/json' }
     });
 
-    const prompt = `${MASTER_SYSTEM_PROMPT}\n\nLütfen bu soruyu analiz et:\n"""\n${text}\n"""`;
-    const result = await model.generateContent(prompt);
-    const textOutput = result.response.text();
-    return JSON.parse(textOutput.trim());
+    const prompt = `${MASTER_SYSTEM_PROMPT}\n\nAnaliz Edilecek Soru Metni:\n${text}`;
+    const res = await model.generateContent(prompt);
+    const raw = res.response.text();
+    return JSON.parse(raw);
   },
 
-  finalizeAnalysis(
-    rawResult: Partial<AnalysisResult>,
+  async finalizeAnalysis(
+    parsed: AnalysisResult,
     rawText: string,
     existingUserErrors: UserError[]
-  ): AnalysisResult {
-    let wrongWord = (rawResult.wrong_word || '').trim();
-    let correctWord = (rawResult.correct_word || '').trim();
-    let ruleCategory = rawResult.rule_category || 'Yazım Kuralları';
-
-    // Verify against local TDK knowledge base
-    const verified = tdkService.verifyWord(wrongWord, correctWord);
-    wrongWord = verified.wrong_word;
-    correctWord = verified.correct_word;
-    if (verified.rule_category) {
-      ruleCategory = verified.rule_category;
+  ): Promise<AnalysisResult> {
+    if (parsed.wrong_word) {
+      parsed.wrong_word = parsed.wrong_word.replace(/^[\.,:;"'“”‘’\(\)]+|[\.,:;"'“”‘’\(\)]+$/g, '').trim();
+    }
+    if (parsed.correct_word) {
+      parsed.correct_word = parsed.correct_word.replace(/^[\.,:;"'“”‘’\(\)]+|[\.,:;"'“”‘’\(\)]+$/g, '').trim();
     }
 
-    // Safeguard: wrong_word and correct_word must never be identical
-    if (wrongWord.toLocaleLowerCase('tr-TR') === correctWord.toLocaleLowerCase('tr-TR')) {
-      const match = rawText.match(/\b(herzaman|yanlış|yalnış|kiprik|kirpik|birtakım|sivri biber|alt üst|doğa sever|şehirlerarası)\b/i);
-      if (match) {
-        const fallbackWord = match[1];
-        const localCheck = tdkService.verifyWord(fallbackWord, '');
-        wrongWord = localCheck.wrong_word;
-        correctWord = localCheck.correct_word;
+    // Auto-fix if identical or missing
+    if (
+      !parsed.wrong_word ||
+      !parsed.correct_word ||
+      parsed.wrong_word.toLocaleLowerCase('tr-TR') === parsed.correct_word.toLocaleLowerCase('tr-TR')
+    ) {
+      const fixed = this.inspectOptionsLocally(parsed.options || {}, rawText);
+      if (fixed) {
+        parsed.wrong_option = fixed.wrong_option;
+        parsed.wrong_word = fixed.wrong_word;
+        parsed.correct_word = fixed.correct_word;
+        parsed.rule_category = fixed.rule_category;
+        parsed.explanation = fixed.explanation;
       }
     }
 
-    // Dynamic Coach Note
-    const coachNote = this.generateCoachNote(ruleCategory, existingUserErrors);
+    // Cross-verify with TDK service
+    const tdkCheck = await tdkService.verifyWithTdk(parsed.wrong_word || parsed.correct_word);
+    if (tdkCheck.isValid && tdkCheck.correctForm) {
+      parsed.correct_word = tdkCheck.correctForm;
+    }
 
-    return {
-      question_text: rawResult.question_text || rawText.split('\n')[0] || rawText,
-      options: (rawResult.options as QuestionOptions) || this.extractOptionsFallback(rawText),
-      wrong_option: rawResult.wrong_option || 'A',
-      wrong_word: wrongWord || 'hatalı kelime',
-      correct_word: correctWord || 'doğru kelime',
-      rule_category: ruleCategory,
-      explanation: rawResult.explanation || `${ruleCategory} kurallarına göre bu sözcüğün doğru yazımı '${correctWord}' şeklindedir.`,
-      coach_note: coachNote,
-      difficulty_score: rawResult.difficulty_score || 5
-    };
+    const sameRuleCount = existingUserErrors.filter(
+      e => (e.rule_category || '').toLocaleLowerCase('tr-TR') === (parsed.rule_category || '').toLocaleLowerCase('tr-TR')
+    ).length;
+
+    if (sameRuleCount >= 2) {
+      parsed.coach_note = `Bu kuralı bu ay ${sameRuleCount + 1}. kez karıştırdın, dikkat etmende fayda var. Kısa bir tekrar sınavda net kazandırır!`;
+    }
+
+    return parsed;
   },
 
-  localFallback(rawText: string, existingUserErrors: UserError[]): AnalysisResult {
-    const options = this.extractOptionsFallback(rawText);
-    const topRule = tdkService.suggestStudyCategory(existingUserErrors);
+  inspectOptionsLocally(options: QuestionOptions, _rawText: string) {
+    const rules = [
+      // 1. Düzeltme İşareti (Şapka)
+      { wrong: 'tezgahtaki', correct: 'tezgâhtaki', category: 'Düzeltme İşareti (Şapka ^)', exp: "TDK'ye göre 'tezgâh' sözcüğü düzeltme işaretiyle (şapka) yazılır." },
+      { wrong: 'tezgah', correct: 'tezgâh', category: 'Düzeltme İşareti (Şapka ^)', exp: "TDK'ye göre 'tezgâh' sözcüğü düzeltme işaretiyle (şapka) yazılır." },
+      { wrong: 'dukkan', correct: 'dükkân', category: 'Düzeltme İşareti (Şapka ^)', exp: "TDK'ye göre 'dükkân' sözcüğü düzeltme işaretiyle (şapka) yazılır." },
+      { wrong: 'kagit', correct: 'kâğıt', category: 'Düzeltme İşareti (Şapka ^)', exp: "TDK'ye göre 'kâğıt' sözcüğü düzeltme işaretiyle (şapka) yazılır." },
+
+      // 2. İkilemeler
+      { wrong: 'başabaş', correct: 'başa baş', category: 'İkilemelerin Yazımı', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'başa baş' olmalıdır." },
+      { wrong: 'içlidışlı', correct: 'içli dışlı', category: 'İkilemelerin Yazımı', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'içli dışlı' olmalıdır." },
+      { wrong: 'artarda', correct: 'art arda', category: 'İkilemelerin Yazımı', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'art arda' olmalıdır." },
+
+      // 3. Kalıplaşmış Birleşik Kelimeler
+      { wrong: 'zeytin yağlı', correct: 'zeytinyağlı', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'zeytinyağı' ve 'zeytinyağlı' kalıplaşmış olarak bitişik yazılır." },
+      { wrong: 'zeytin yağı', correct: 'zeytinyağı', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'zeytinyağı' bitişik yazılır." },
+      { wrong: 'dere otu', correct: 'dereotu', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'dereotu' bitişik yazılır." },
+
+      // 4. Yardımcı Fiiller
+      { wrong: 'arzetti', correct: 'arz etti', category: 'Ayrı Yazılan Kelimeler', exp: "Ses olayı (düşme/türeme) olmayan birleşik fiiller ayrı yazılır." },
+      { wrong: 'farketti', correct: 'fark etti', category: 'Ayrı Yazılan Kelimeler', exp: "Ses olayı olmayan birleşik fiiller ayrı yazılır." },
+      { wrong: 'terketti', correct: 'terk etti', category: 'Ayrı Yazılan Kelimeler', exp: "Ses olayı olmayan birleşik fiiller ayrı yazılır." },
+      { wrong: 'ayırtetmemizi', correct: 'ayırt etmemizi', category: 'Ayrı Yazılan Kelimeler', exp: "Ses olayı olmayan birleşik fiiller ayrı yazılır." },
+      { wrong: 'haketti', correct: 'hak etti', category: 'Ayrı Yazılan Kelimeler', exp: "Ses olayı olmayan birleşik fiiller ayrı yazılır." },
+
+      // 5. Kesme İşareti (Kurum/Üniversite)
+      { wrong: "Üniversitesi'nin", correct: "Üniversitesinin", category: "Kesme İşaretinin Kullanımı", exp: "Kurum ve üniversite adlarına gelen ekler kesme işaretiyle ayrılmaz." },
+      { wrong: "Kurumu'nun", correct: "Kurumunun", category: "Kesme İşaretinin Kullanımı", exp: "Kurum ve kuruluş adlarına gelen ekler kesme işaretiyle ayrılmaz." }
+    ];
+
+    for (const [key, optText] of Object.entries(options)) {
+      if (!optText) continue;
+      const lower = optText.toLocaleLowerCase('tr-TR');
+
+      for (const rule of rules) {
+        if (lower.includes(rule.wrong.toLocaleLowerCase('tr-TR'))) {
+          return {
+            wrong_option: key,
+            wrong_word: rule.wrong,
+            correct_word: rule.correct,
+            rule_category: rule.category,
+            explanation: rule.exp
+          };
+        }
+      }
+    }
+
+    return null;
+  },
+
+  localFallback(text: string, _existingUserErrors: UserError[]): AnalysisResult {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const options: QuestionOptions = {};
+    let questionText = "Aşağıdaki cümlelerin hangisinde bir yazım yanlışı vardır?";
+
+    const optionRegex = /^([A-E])[\)\.\-]\s*(.*)$/i;
+    const nonOptions: string[] = [];
+
+    lines.forEach(l => {
+      const match = l.match(optionRegex);
+      if (match) {
+        options[match[1].toUpperCase()] = match[2];
+      } else {
+        nonOptions.push(l);
+      }
+    });
+
+    if (nonOptions.length > 0) {
+      questionText = nonOptions.join(' ');
+    }
+
+    const inspected = this.inspectOptionsLocally(options, text);
+    if (inspected) {
+      return {
+        question_text: questionText,
+        options: Object.keys(options).length > 0 ? options : { A: text },
+        wrong_option: inspected.wrong_option,
+        wrong_word: inspected.wrong_word,
+        correct_word: inspected.correct_word,
+        rule_category: inspected.rule_category,
+        explanation: inspected.explanation,
+        coach_note: "TYT Türkçe sınavında TDK yazım kuralları her yıl mutlaka test edilir.",
+        difficulty_score: 5
+      };
+    }
+
+    const firstKey = Object.keys(options)[0] || 'A';
+    const firstText = options[firstKey] || text;
+    const words = firstText.split(/\s+/).filter(w => w.length > 3);
+    const dynamicWord = words[0] || "bu sözcük";
 
     return {
-      question_text: rawText.split('\n')[0] || rawText,
-      options,
-      wrong_option: 'A',
-      wrong_word: 'hatalı kelime',
-      correct_word: 'doğru kelime',
-      rule_category: topRule,
-      explanation: 'TDK Güncel Yazım Kılavuzu kurallarına göre incelenmiştir.',
-      coach_note: `💡 Koç Uyarısı: Bu kural TYT denemelerinde en sık çeldirici olarak kullanılan başlıklardan biridir.`,
+      question_text: questionText,
+      options: Object.keys(options).length > 0 ? options : { A: text },
+      wrong_option: firstKey,
+      wrong_word: dynamicWord,
+      correct_word: dynamicWord,
+      rule_category: "Yazım Kuralları",
+      explanation: "TDK Yazım Kılavuzu kurallarına dikkat edilmelidir.",
+      coach_note: "Sözcüklerin TDK kurallarına uygun yazılışını düzenli tekrar edin.",
       difficulty_score: 5
     };
-  },
-
-  extractOptionsFallback(text: string): QuestionOptions {
-    const options: QuestionOptions = {};
-    const lines = text.split('\n');
-    const optionRegex = /^([A-Ea-e])[\)\.\-\s]\s*(.*)$/;
-
-    for (const line of lines) {
-      const match = line.trim().match(optionRegex);
-      if (match) {
-        const key = match[1].toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-        options[key] = match[2].trim();
-      }
-    }
-
-    return options;
-  },
-
-  generateCoachNote(category: string, existingUserErrors: UserError[]): string {
-    const count = existingUserErrors.filter((e) => e.rule_category === category).length;
-    if (count >= 2) {
-      return `💡 Koç Uyarısı: '${category}' kuralını bu ay ${count + 1}. kez karıştırdın! Sınavda bu soru tipine ekstra dikkat etmelisin.`;
-    }
-    if (count === 1) {
-      return `💡 Koç Notu: Bu kuralı daha önce 1 kez daha kaydetmiştin. Tekrar ederek netlerini sabitleyelim!`;
-    }
-    return `💡 Koç Notu: TYT Türkçe'de '${category}' soruları her yıl ortalama 1-2 soru olarak karşına çıkar.`;
   }
 };
