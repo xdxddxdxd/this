@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, Type, Sparkles, Check, ArrowRight, ArrowLeft, BookOpen, Layers } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { X, Camera, Type, Sparkles, Check, ArrowRight, ArrowLeft, Layers, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AnalysisResult, UserError } from '../types';
 import { geminiService } from '../services/geminiService';
 import { groqService } from '../services/groqService';
-import { splitQuestions } from '../services/questionSplitter';
+import { splitQuestions, enrichOptionsWithPhrases } from '../services/questionSplitter';
 import { GET_RANDOM_RULE } from '../data/rulesData';
+import { HighlightedQuestionText } from './HighlightedText';
 
 interface AddQuestionModalProps {
   isOpen: boolean;
@@ -26,30 +27,62 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
   const [inputText, setInputText] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [loadingProgressText, setLoadingProgressText] = useState('Soru Analiz Ediliyor...');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [analyzedResults, setAnalyzedResults] = useState<AnalysisResult[]>([]);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const [currentRule, setCurrentRule] = useState(GET_RANDOM_RULE());
+  const [ruleAnimClass, setRuleAnimClass] = useState<string>('flashcard-slide-idle');
+  const [flashcardKey, setFlashcardKey] = useState<number>(0);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cancelTokenRef = useRef<number>(0);
 
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
 
-  // Rotate random TYT rules every 4 seconds during waiting experience
+  // Esc key listener for modal
   useEffect(() => {
-    let interval: any;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSaving) {
+        handleCloseModal();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isSaving]);
+
+  // Rotate random TYT rules every 8 seconds during waiting experience with smooth slide-out / slide-in animation
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (isLoading) {
       interval = setInterval(() => {
-        setCurrentRule(GET_RANDOM_RULE());
-      }, 4000);
+        setRuleAnimClass('flashcard-slide-out');
+        setTimeout(() => {
+          setCurrentRule(GET_RANDOM_RULE());
+          setFlashcardKey((k) => k + 1);
+          setRuleAnimClass('flashcard-slide-in');
+          setTimeout(() => {
+            setRuleAnimClass('flashcard-slide-idle');
+          }, 50);
+        }, 320);
+      }, 8000);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [isLoading]);
 
-  if (!isOpen) return null;
+  const detectedQuestionsCount = useMemo(() => {
+    if (mode !== 'text' || !inputText.trim()) return 0;
+    return Math.min(10, splitQuestions(inputText).length);
+  }, [mode, inputText]);
 
-  const detectedQuestionsCount = mode === 'text' && inputText.trim() ? splitQuestions(inputText).length : 0;
+  if (!isOpen) return null;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -83,18 +116,29 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
             setImagePreview(event.target?.result as string);
           }
         };
+        img.onerror = () => {
+          setErrorMsg('Görsel dosyası işlenemedi. Lütfen geçerli bir JPG veya PNG yükleyin.');
+        };
         img.src = event.target?.result as string;
       };
       reader.readAsDataURL(file);
     }
   };
 
+  const handleCancelAnalysis = () => {
+    cancelTokenRef.current++;
+    setIsLoading(false);
+    setLoadingProgressText('İptal Edildi');
+  };
+
   const handleStartAnalysis = async () => {
     if (mode === 'text' && !inputText.trim()) return;
     if (mode === 'photo' && !imagePreview) return;
 
+    setErrorMsg(null);
     setIsLoading(true);
     setCurrentRule(GET_RANDOM_RULE());
+    const token = ++cancelTokenRef.current;
 
     try {
       let questions: string[] = [];
@@ -102,103 +146,159 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
       if (mode === 'photo' && imagePreview) {
         setLoadingProgressText('Fotoğraftaki soru ve şıklar taranıyor...');
         const ocrText = await geminiService.extractTextFromImage(imagePreview);
-        if (ocrText && ocrText.trim()) {
-          questions = splitQuestions(ocrText);
-        } else {
-          const fallbackRes = await geminiService.analyzeImage(imagePreview, existingErrors);
-          setAnalyzedResults([fallbackRes]);
-          setActiveResultIndex(0);
+        if (cancelTokenRef.current !== token) return;
+
+        if (!ocrText || ocrText.trim().length < 10) {
+          setErrorMsg('Fotoğraftaki soru metni net okunamadı. Lütfen fotoğrafın daha net ve aydınlık olduğundan emin olun veya soruyu metin olarak yapıştırın.');
+          setIsLoading(false);
           return;
         }
+        questions = splitQuestions(ocrText).slice(0, 10);
       } else {
-        questions = splitQuestions(inputText);
+        questions = splitQuestions(inputText).slice(0, 10);
+      }
+
+      if (cancelTokenRef.current !== token) return;
+
+      if (questions.length === 0) {
+        setErrorMsg('Analiz edilecek geçerli bir soru bulunamadı.');
+        setIsLoading(false);
+        return;
       }
 
       if (questions.length === 1) {
         setLoadingProgressText('Soru analiz ediliyor...');
         const res = await groqService.analyzeTextWithLlama(questions[0], existingErrors);
+        if (cancelTokenRef.current !== token) return;
+        res.options = enrichOptionsWithPhrases(res.question_text, res.options || {});
         setAnalyzedResults([res]);
         setActiveResultIndex(0);
       } else if (questions.length > 1) {
         const batchResults: AnalysisResult[] = [];
         for (let i = 0; i < questions.length; i++) {
+          if (cancelTokenRef.current !== token) return;
           setLoadingProgressText(`Soru ${i + 1} / ${questions.length} analiz ediliyor...`);
           const res = await groqService.analyzeTextWithLlama(questions[i], existingErrors);
+          if (cancelTokenRef.current !== token) return;
+          res.options = enrichOptionsWithPhrases(res.question_text, res.options || {});
           batchResults.push(res);
           if (i + 1 < questions.length) {
-            await new Promise(r => setTimeout(r, 400));
+            await new Promise(r => setTimeout(r, 350));
           }
         }
+        if (cancelTokenRef.current !== token) return;
         setAnalyzedResults(batchResults);
         setActiveResultIndex(0);
       }
-    } catch (err) {
-      console.error('Analysis error:', err);
+    } catch (err: any) {
+      if (cancelTokenRef.current === token) {
+        console.error('Analysis error:', err);
+        setErrorMsg(err?.message || 'Analiz sırasında beklenmeyen bir hata oluştu.');
+      }
     } finally {
-      setIsLoading(false);
+      if (cancelTokenRef.current === token) {
+        setIsLoading(false);
+      }
     }
   };
 
   const handleSaveAll = async () => {
-    if (analyzedResults.length === 0) return;
-    for (const res of analyzedResults) {
-      await onSave(res);
-    }
-    confetti({
-      particleCount: 70,
-      spread: 70,
-      origin: { y: 0.8 },
-      colors: ['#D6303F', '#3F7D5C', '#1C1C1E']
-    });
-    handleCloseModal();
-  };
+    if (isSaving || analyzedResults.length === 0) return;
+    setIsSaving(true);
+    setErrorMsg(null);
 
-  const handleSaveCurrentOnly = async () => {
-    const current = analyzedResults[activeResultIndex];
-    if (!current) return;
-    await onSave(current);
-
-    if (analyzedResults.length > 1) {
-      const remaining = analyzedResults.filter((_, idx) => idx !== activeResultIndex);
-      setAnalyzedResults(remaining);
-      setActiveResultIndex(Math.min(activeResultIndex, remaining.length - 1));
-    } else {
+    try {
+      for (const res of analyzedResults) {
+        await onSave(res);
+      }
       confetti({
-        particleCount: 50,
-        spread: 60,
+        particleCount: 70,
+        spread: 70,
         origin: { y: 0.8 },
         colors: ['#D6303F', '#3F7D5C', '#1C1C1E']
       });
       handleCloseModal();
+    } catch (err: any) {
+      console.error('Save all error:', err);
+      setErrorMsg('Kayıt sırasında bir hata oluştu: ' + (err?.message || 'Lütfen tekrar deneyin.'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveCurrentOnly = async () => {
+    if (isSaving) return;
+    const current = analyzedResults[activeResultIndex];
+    if (!current) return;
+
+    setIsSaving(true);
+    setErrorMsg(null);
+
+    try {
+      await onSave(current);
+
+      if (analyzedResults.length > 1) {
+        const remaining = analyzedResults.filter((_, idx) => idx !== activeResultIndex);
+        setAnalyzedResults(remaining);
+        setActiveResultIndex(Math.min(activeResultIndex, remaining.length - 1));
+      } else {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.8 },
+          colors: ['#D6303F', '#3F7D5C', '#1C1C1E']
+        });
+        handleCloseModal();
+      }
+    } catch (err: any) {
+      console.error('Save current error:', err);
+      setErrorMsg('Kayıt sırasında bir hata oluştu: ' + (err?.message || 'Lütfen tekrar deneyin.'));
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleCloseModal = () => {
+    cancelTokenRef.current++;
     setInputText('');
     setImagePreview(null);
     setAnalyzedResults([]);
     setActiveResultIndex(0);
     setIsLoading(false);
+    setIsSaving(false);
+    setErrorMsg(null);
     onClose();
   };
 
   const currentResult = analyzedResults[activeResultIndex];
 
   return (
-    <div className="modal-overlay" onClick={handleCloseModal}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
-        {/* Header */}
-        <div style={{ padding: '16px 20px 14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)' }}>
-          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 700 }}>
+    <div className="modal-overlay" onClick={handleCloseModal} role="dialog" aria-modal="true">
+      <div
+        className="modal-content modal-content-large"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxHeight: '90vh', overflowY: 'auto' }}
+      >
+        {/* Modal Header */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--color-border)'
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, fontFamily: 'var(--font-serif)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkles size={18} color="var(--color-red)" />
             {analyzedResults.length > 0
-              ? analyzedResults.length > 1
-                ? `Analiz Sonuçları (${activeResultIndex + 1}/${analyzedResults.length})`
-                : 'Analiz Sonucu'
-              : 'Yeni Soru / Kelime Ekle'}
+              ? `Analiz Sonucu (${activeResultIndex + 1}/${analyzedResults.length})`
+              : 'Yeni Soru Analiz Et'}
           </h3>
           <button
             onClick={handleCloseModal}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+            disabled={isSaving}
           >
             <X size={22} />
           </button>
@@ -206,25 +306,81 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
 
         {/* 1. LOADING & WAITING EXPERIENCE */}
         {isLoading && (
-          <div className="waiting-container">
+          <div className="waiting-container" style={{ padding: '24px 16px', textAlign: 'center' }}>
             <div className="waiting-spinner-ring" />
-            <h4 className="waiting-title">{loadingProgressText}</h4>
-            <p className="waiting-subtitle">TDK sözlük kuralları taranıyor ve soru çözümleniyor.</p>
+            <h4 className="waiting-title" style={{ marginTop: '16px', fontSize: '1.05rem', fontWeight: 700 }}>
+              {loadingProgressText}
+            </h4>
+            <p className="waiting-subtitle" style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              TDK sözlük kuralları taranıyor ve soru çözümleniyor.
+            </p>
 
-            <div className="waiting-rule-flashcard">
-              <span className="flashcard-badge">{currentRule.category}</span>
-              <h5 className="flashcard-title">{currentRule.title}</h5>
-              <p className="flashcard-body">{currentRule.description}</p>
-              {currentRule.tip && (
-                <p className="flashcard-tip">💡 İpucu: {currentRule.tip}</p>
-              )}
+            <div className="waiting-rule-flashcard-wrapper">
+              <div key={flashcardKey} className="flashcard-progress-bar" />
+              <div className={`waiting-rule-flashcard ${ruleAnimClass}`}>
+                <div style={{ marginBottom: '6px' }}>
+                  <span className="flashcard-badge">{currentRule.category}</span>
+                </div>
+                <h5 className="flashcard-title">{currentRule.title}</h5>
+                <p className="flashcard-body">{currentRule.description}</p>
+                
+                {/* Examples preview if available */}
+                {currentRule.examples && currentRule.examples.length > 0 && (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                    {currentRule.examples.slice(0, 2).map((ex, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          fontSize: '0.74rem',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: 'var(--bg-card-secondary)',
+                          border: '1px solid var(--color-border)'
+                        }}
+                      >
+                        <del style={{ color: 'var(--color-red)', marginRight: '6px' }}>{ex.wrong}</del>
+                        <span style={{ color: '#22c55e', fontWeight: 600 }}>{ex.correct}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {currentRule.tip && (
+                  <p className="flashcard-tip">💡 <strong>İpucu:</strong> {currentRule.tip}</p>
+                )}
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={handleCancelAnalysis}
+              style={{
+                marginTop: '18px',
+                background: 'transparent',
+                border: '1px solid var(--color-border)',
+                borderRadius: '10px',
+                padding: '8px 16px',
+                fontSize: '0.82rem',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              Analizi İptal Et
+            </button>
           </div>
         )}
 
         {/* 2. INPUT FORM */}
         {!isLoading && analyzedResults.length === 0 && (
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Error Banner */}
+            {errorMsg && (
+              <div style={{ padding: '10px 14px', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', border: '1px solid var(--color-red-border)', borderRadius: '10px', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
             {/* Mode Switcher Tabs */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-card-secondary)', padding: '4px', borderRadius: '12px' }}>
               <button
@@ -275,153 +431,229 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
             {mode === 'text' ? (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                    Soruları yapıştırın (Tek veya çoklu soru desteklenir):
+                  <label htmlFor="question-input-textarea" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    Soru Metni ve Şıklar:
                   </label>
                   {detectedQuestionsCount > 1 && (
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)', background: 'var(--color-green-light)', padding: '2px 8px', borderRadius: '10px', border: '1px solid var(--color-green-border)' }}>
-                      <Layers size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '3px' }} />
-                      {detectedQuestionsCount} Soru Algılandı
+                    <span style={{ fontSize: '0.75rem', backgroundColor: 'var(--color-green-light)', color: 'var(--color-green-border)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Layers size={13} /> {detectedQuestionsCount} Soru Tespit Edildi
                     </span>
                   )}
                 </div>
+
                 <textarea
-                  className="form-textarea"
-                  placeholder="Örnek:&#10;1. Aşağıdaki cümlelerin hangisinde yazım yanlışı vardır?&#10;A) Art arda yaşadığımız sıkıntılar...&#10;B) ...&#10;&#10;2. Aşağıdaki cümlelerin hangisinde..."
+                  id="question-input-textarea"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  style={{ minHeight: '160px', fontSize: '0.88rem' }}
+                  placeholder="Örn: Aşağıdaki cümlelerin hangisinde bir yazım yanlışı vardır?&#10;A) Bu konuda her zaman dikkatliyiz.&#10;B) Toplantı saat 10:00'da..."
+                  rows={7}
+                  maxLength={5000}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--bg-card-secondary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.88rem',
+                    lineHeight: 1.5,
+                    resize: 'vertical',
+                    boxSizing: 'border-box'
+                  }}
                 />
               </div>
             ) : (
               <div>
                 <input
                   type="file"
-                  ref={fileInputRef}
                   accept="image/*"
                   capture="environment"
-                  style={{ display: 'none' }}
+                  ref={fileInputRef}
                   onChange={handleFileUpload}
+                  style={{ display: 'none' }}
                 />
 
                 {imagePreview ? (
                   <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
                     <img
                       src={imagePreview}
-                      alt="Yüklenen Soru"
-                      style={{ width: '100%', maxHeight: '240px', objectFit: 'cover', display: 'block' }}
+                      alt="Soru Önizleme"
+                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', display: 'block', backgroundColor: 'var(--bg-card-secondary)' }}
                     />
                     <button
-                      onClick={() => setImagePreview(null)}
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
                       style={{
                         position: 'absolute',
-                        top: '8px',
-                        right: '8px',
-                        background: 'rgba(0,0,0,0.65)',
-                        color: '#FFF',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '28px',
-                        height: '28px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
+                        bottom: '10px',
+                        right: '10px',
+                        backgroundColor: 'var(--bg-card)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--text-primary)',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
                       }}
                     >
-                      <X size={16} />
+                      Fotoğrafı Değiştir
                     </button>
                   </div>
                 ) : (
                   <div
                     onClick={() => fileInputRef.current?.click()}
                     style={{
-                      border: '2px dashed var(--color-border-dashed)',
-                      borderRadius: '14px',
-                      padding: '36px 20px',
+                      border: '2px dashed var(--color-border)',
+                      borderRadius: '12px',
+                      padding: '30px 16px',
                       textAlign: 'center',
                       cursor: 'pointer',
-                      backgroundColor: 'var(--bg-card)'
+                      backgroundColor: 'var(--bg-card-secondary)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}
                   >
-                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--color-red-light)', color: 'var(--color-red)', margin: '0 auto 12px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Camera size={24} />
                     </div>
-                    <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-                      Fotoğraf Çek veya Galeriden Seç
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      Soru fotoğrafı net ve okunabilir olmalıdır
-                    </div>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                      Test Kitabının Fotoğrafını Çek
+                    </span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                      Doğrudan kamera ile çekebilir veya galeriden seçebilirsiniz.
+                    </span>
                   </div>
                 )}
               </div>
             )}
 
             <button
+              type="button"
               className="btn-primary"
               onClick={handleStartAnalysis}
-              disabled={mode === 'text' ? !inputText.trim() : !imagePreview}
+              disabled={isLoading || (mode === 'text' ? !inputText.trim() : !imagePreview)}
               style={{
-                opacity: (mode === 'text' ? !inputText.trim() : !imagePreview) ? 0.6 : 1,
-                cursor: (mode === 'text' ? !inputText.trim() : !imagePreview) ? 'not-allowed' : 'pointer'
+                padding: '12px',
+                fontSize: '0.95rem',
+                opacity: (mode === 'text' ? !inputText.trim() : !imagePreview) ? 0.6 : 1
               }}
             >
               <Sparkles size={18} />
-              {detectedQuestionsCount > 1 ? `${detectedQuestionsCount} Soruyu Analiz Et` : 'Analiz Et ve Doğrula'}
+              {detectedQuestionsCount > 1
+                ? `${detectedQuestionsCount} Soruyu Toplu Analiz Et`
+                : 'Yapay Zekâ ile Analiz Et'}
             </button>
           </div>
         )}
 
-        {/* 3. RESULT PREVIEW & CONFIRMATION */}
-        {!isLoading && currentResult && (
-          <div style={{ padding: '16px 20px 20px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            
-            {/* Multiple Questions Pagination Tabs */}
-            {analyzedResults.length > 1 && (
-              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-                {analyzedResults.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveResultIndex(idx)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: activeResultIndex === idx ? '1px solid var(--color-red)' : '1px solid var(--color-border)',
-                      background: activeResultIndex === idx ? 'var(--color-red-light)' : 'var(--bg-card)',
-                      color: activeResultIndex === idx ? 'var(--color-red)' : 'var(--text-secondary)',
-                      fontWeight: 700,
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Soru {idx + 1}
-                  </button>
-                ))}
+        {/* 3. MULTI-QUESTION / SINGLE QUESTION RESULTS VIEW */}
+        {!isLoading && analyzedResults.length > 0 && currentResult && (
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {errorMsg && (
+              <div style={{ padding: '10px 14px', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', border: '1px solid var(--color-red-border)', borderRadius: '10px', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                <span>{errorMsg}</span>
               </div>
             )}
 
-            {/* Question Box */}
-            <div className="exam-paper-card" style={{ padding: '16px' }}>
-              <div style={{ fontSize: '0.95rem', fontWeight: 700, fontFamily: 'var(--font-serif)', marginBottom: '10px' }}>
-                {currentResult.question_text}
+            {/* Carousel Navigation Header (If multiple questions detected) */}
+            {analyzedResults.length > 1 && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: 'var(--bg-card-secondary)',
+                  padding: '8px 12px',
+                  borderRadius: '10px'
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={activeResultIndex === 0}
+                  onClick={() => setActiveResultIndex((prev) => Math.max(0, prev - 1))}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    color: activeResultIndex === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
+                    cursor: activeResultIndex === 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600
+                  }}
+                >
+                  <ArrowLeft size={16} /> Önceki
+                </button>
+
+                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--color-red)' }}>
+                  Soru {activeResultIndex + 1} / {analyzedResults.length}
+                </span>
+
+                <button
+                  type="button"
+                  disabled={activeResultIndex === analyzedResults.length - 1}
+                  onClick={() => setActiveResultIndex((prev) => Math.min(analyzedResults.length - 1, prev + 1))}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    color: activeResultIndex === analyzedResults.length - 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+                    cursor: activeResultIndex === analyzedResults.length - 1 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600
+                  }}
+                >
+                  Sonraki <ArrowRight size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* Question Card Display */}
+            <div
+              className="paper-question-container"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '12px',
+                padding: '16px'
+              }}
+            >
+              <div style={{ fontSize: '0.92rem', fontWeight: 600, lineHeight: 1.5, marginBottom: '12px' }}>
+                <HighlightedQuestionText
+                  text={currentResult.question_text}
+                  wrongWord={currentResult.wrong_word}
+                  correctWord={currentResult.correct_word}
+                />
               </div>
 
-              {/* Options */}
-              {Object.keys(currentResult.options || {}).map((k) => {
-                const isWrongOpt = currentResult.wrong_option === k;
-                const optText = (currentResult.options && currentResult.options[k]) || '';
-                const wrongWord = currentResult.wrong_word || '';
-                const hasWrongWord = wrongWord && optText.toLocaleLowerCase('tr-TR').includes(wrongWord.toLocaleLowerCase('tr-TR'));
-                const wrongIdx = hasWrongWord ? optText.toLocaleLowerCase('tr-TR').indexOf(wrongWord.toLocaleLowerCase('tr-TR')) : -1;
+              {/* Render Options */}
+              {['A', 'B', 'C', 'D', 'E'].map((k) => {
+                const enrichedOpts = enrichOptionsWithPhrases(currentResult.question_text, currentResult.options || {});
+                const optText = (enrichedOpts as any)?.[k] || (currentResult.options as any)?.[k];
+                if (!optText) return null;
+                const isWrongOpt = currentResult.wrong_option?.toUpperCase() === k;
+                const wrongWord = currentResult.wrong_word;
+                const hasWrongWord = wrongWord && optText.includes(wrongWord);
+                const wrongIdx = hasWrongWord ? optText.indexOf(wrongWord) : -1;
 
                 return (
                   <div
                     key={k}
                     style={{
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      marginBottom: '6px',
+                      backgroundColor: isWrongOpt ? 'var(--color-red-light)' : 'transparent',
+                      border: isWrongOpt ? '1px solid var(--color-red-border)' : '1px solid transparent',
                       fontSize: '0.88rem',
-                      margin: '6px 0',
+                      lineHeight: 1.45,
                       color: isWrongOpt ? 'var(--color-red)' : 'inherit',
                       fontWeight: isWrongOpt ? 600 : 'normal'
                     }}
@@ -468,12 +700,13 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
 
             {/* Coach Note */}
             {currentResult.coach_note && (
-              <div className="coach-note-card" style={{ padding: '12px 14px' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', fontFamily: 'var(--font-serif)', marginBottom: '4px' }}>
-                  Koç Uyarısı
-                </div>
-                <div style={{ fontFamily: 'var(--font-handwriting)', fontSize: '1.18rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>
-                  {currentResult.coach_note}
+              <div className="coach-note-card">
+                <div className="coach-note-header">KOÇ NOTU</div>
+                <div className="coach-note-content">
+                  <span className="coach-handwriting-icon" aria-hidden="true">!</span>
+                  <div className="coach-note-text">
+                    {currentResult.coach_note}
+                  </div>
                 </div>
               </div>
             )}
@@ -482,14 +715,20 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {analyzedResults.length > 1 ? (
                 <>
-                  <button className="btn-primary" onClick={handleSaveAll} style={{ padding: '12px' }}>
-                    <Check size={18} /> Tümünü Havuzuma Kaydet ({analyzedResults.length} Soru)
+                  <button
+                    className="btn-primary"
+                    onClick={handleSaveAll}
+                    disabled={isSaving}
+                    style={{ padding: '12px' }}
+                  >
+                    <Check size={18} />
+                    {isSaving ? 'Tüm Sorular Kaydediliyor...' : `Tümünü Havuzuma Kaydet (${analyzedResults.length} Soru)`}
                   </button>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                       className="btn-secondary"
                       style={{ flex: 1 }}
-                      disabled={activeResultIndex === 0}
+                      disabled={activeResultIndex === 0 || isSaving}
                       onClick={() => setActiveResultIndex(prev => Math.max(0, prev - 1))}
                     >
                       <ArrowLeft size={16} /> Önceki Soru
@@ -497,7 +736,7 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
                     <button
                       className="btn-secondary"
                       style={{ flex: 1 }}
-                      disabled={activeResultIndex === analyzedResults.length - 1}
+                      disabled={activeResultIndex === analyzedResults.length - 1 || isSaving}
                       onClick={() => setActiveResultIndex(prev => Math.min(analyzedResults.length - 1, prev + 1))}
                     >
                       Sonraki Soru <ArrowRight size={16} />
@@ -506,10 +745,19 @@ export const AddQuestionModal: React.FC<AddQuestionModalProps> = ({
                 </>
               ) : (
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button className="btn-primary" style={{ flex: 1 }} onClick={handleSaveCurrentOnly}>
-                    <Check size={18} /> Onayla ve Kaydet
+                  <button
+                    className="btn-primary"
+                    style={{ flex: 1 }}
+                    onClick={handleSaveCurrentOnly}
+                    disabled={isSaving}
+                  >
+                    <Check size={18} /> {isSaving ? 'Kaydediliyor...' : 'Onayla ve Kaydet'}
                   </button>
-                  <button className="btn-secondary" onClick={() => setAnalyzedResults([])}>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => setAnalyzedResults([])}
+                    disabled={isSaving}
+                  >
                     Tekrar Dene
                   </button>
                 </div>
