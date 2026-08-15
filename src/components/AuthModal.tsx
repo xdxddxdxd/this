@@ -5,7 +5,7 @@ import { authService } from '../services/authService';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (user?: any) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -13,7 +13,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   onSuccess
 }) => {
-  const [activeTab, setActiveTab] = useState<'switch' | 'create'>('switch');
   const [newName, setNewName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +24,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setError('Lütfen bir isim veya kullanıcı adı girin.');
       return;
     }
-    onSuccess();
+    localStorage.setItem('tdk_user_name', newName.trim());
+    const user = {
+      id: 'local-user',
+      username: newName.trim().toLowerCase().replace(/\s+/g, ''),
+      email: `${newName.trim().toLowerCase().replace(/\s+/g, '')}@yks-hedef.com`,
+      full_name: newName.trim(),
+      avatar_url: '',
+      created_at: new Date().toISOString()
+    };
+    onSuccess(user);
     onClose();
   };
 

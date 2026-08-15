@@ -1,58 +1,81 @@
 import React, { useState, useEffect } from 'react';
+import { User, UserError, AnalysisResult } from './types';
+import { authService } from './services/authService';
+import { errorService } from './services/errorService';
 import { Dashboard } from './components/Dashboard';
 import { MyErrors } from './components/MyErrors';
 import { Profile } from './components/Profile';
 import { BottomNav } from './components/BottomNav';
 import { AddQuestionModal } from './components/AddQuestionModal';
-import { CustomQuizModal } from './components/CustomQuizModal';
 import { QuestionDetailModal } from './components/QuestionDetailModal';
-import { PdfExportModal } from './components/PdfExportModal';
 import { AuthModal } from './components/AuthModal';
-import { UserError, AnalysisResult } from './types';
-import { errorService } from './services/errorService';
+import { OnboardingView } from './components/OnboardingView';
+import { CustomQuizModal } from './components/CustomQuizModal';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-errors' | 'profile'>('dashboard');
+  const [currentUser, setCurrentUser] = useState<User | null>(() => authService.getCurrentUser());
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'errors' | 'profile'>('dashboard');
   const [errors, setErrors] = useState<UserError[]>([]);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [isLoadingErrors, setIsLoadingErrors] = useState(true);
 
-  // Modals state
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
-  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [selectedError, setSelectedError] = useState<UserError | null>(null);
+  // Black & White Theme State (Initializes from saved preference or OS system theme)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('tdk_theme');
+    if (saved === 'light' || saved === 'dark') {
+      return saved;
+    }
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'dark'; // Default fallback to dark B&W
+  });
 
-  // Initialize theme
   useEffect(() => {
-    const savedTheme = (localStorage.getItem('tdk_theme') as 'dark' | 'light') || 'dark';
-    setTheme(savedTheme);
-    document.documentElement.setAttribute('data-theme', savedTheme);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  // Listen to OS system theme changes if user hasn't explicitly set a preference
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      const explicit = localStorage.getItem('tdk_theme');
+      if (!explicit) {
+        setTheme(e.matches ? 'dark' : 'light');
+      }
+    };
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
   }, []);
 
-  const handleThemeChange = (newTheme: 'dark' | 'light') => {
+  const handleSetTheme = (newTheme: 'dark' | 'light') => {
     setTheme(newTheme);
     localStorage.setItem('tdk_theme', newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
   };
 
-  // Load user errors
+  // Modal States
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addModalMode, setAddModalMode] = useState<'text' | 'photo'>('text');
+  const [selectedError, setSelectedError] = useState<UserError | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+
+  // Load user errors on mount or when user changes
   useEffect(() => {
-    loadErrors();
-  }, []);
-
-  const loadErrors = async () => {
-    try {
-      const data = await errorService.getErrors('local-user');
-      setErrors(data);
-    } catch (err) {
-      console.warn('Failed to load errors:', err);
+    if (currentUser) {
+      setIsLoadingErrors(true);
+      errorService.getUserErrors(currentUser.id).then((data) => {
+        setErrors(data);
+        setIsLoadingErrors(false);
+      });
     }
-  };
+  }, [currentUser]);
 
-  const handleSaveAnalysis = async (result: AnalysisResult) => {
-    const saved = await errorService.saveError({
-      user_id: 'local-user',
+  // Handle saving new analyzed question
+  const handleSaveAnalyzedQuestion = async (result: AnalysisResult) => {
+    if (!currentUser) return;
+    const newRecord = await errorService.addError({
+      user_id: currentUser.id,
       question_text: result.question_text,
       options: result.options,
       wrong_option: result.wrong_option,
@@ -61,88 +84,105 @@ export function App() {
       rule_category: result.rule_category,
       explanation: result.explanation,
       coach_note: result.coach_note,
+      difficulty_score: result.difficulty_score || 5,
       is_favorite: false
     });
-    setErrors(prev => [saved, ...prev]);
+
+    setErrors((prev) => [newRecord, ...prev.filter((e) => e.id !== newRecord.id)]);
   };
 
+  // Handle updating an existing error
   const handleUpdateError = async (id: string, updates: Partial<UserError>) => {
-    await errorService.updateError(id, updates, 'local-user');
-    setErrors(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+    if (!currentUser) return;
+    await errorService.updateError(id, updates, currentUser.id);
+    setErrors((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, ...updates, updated_at: new Date().toISOString() } : e))
+    );
     if (selectedError && selectedError.id === id) {
-      setSelectedError(prev => prev ? { ...prev, ...updates } : null);
+      setSelectedError({ ...selectedError, ...updates, updated_at: new Date().toISOString() });
     }
   };
 
+  // Handle deleting an error
   const handleDeleteError = async (id: string) => {
-    await errorService.deleteError(id, 'local-user');
-    setErrors(prev => prev.filter(e => e.id !== id));
+    if (!currentUser) return;
+    await errorService.deleteError(id, currentUser.id);
+    setErrors((prev) => prev.filter((e) => e.id !== id));
+    if (selectedError && selectedError.id === id) {
+      setSelectedError(null);
+    }
   };
 
-  const handleDeleteMultipleErrors = async (ids: string[]) => {
-    await errorService.deleteMultipleErrors(ids, 'local-user');
-    setErrors(prev => prev.filter(e => !ids.includes(e.id)));
+  // Handle toggle favorite
+  const handleToggleFavorite = async (id: string, isFav: boolean) => {
+    if (!currentUser) return;
+    await handleUpdateError(id, { is_favorite: isFav });
   };
 
-  const handleToggleMultipleFavorites = async (ids: string[], isFav: boolean) => {
-    await errorService.toggleMultipleFavorites(ids, isFav, 'local-user');
-    setErrors(prev => prev.map(e => ids.includes(e.id) ? { ...e, is_favorite: isFav } : e));
+  const handleOpenAdd = (mode: 'text' | 'photo') => {
+    setAddModalMode(mode);
+    setIsAddModalOpen(true);
   };
+
+  // If no user is logged in, show direct Onboarding & Login screen
+  if (!currentUser) {
+    return <OnboardingView onSuccess={(user) => setCurrentUser(user)} />;
+  }
 
   return (
-    <div className="app-layout">
-      <main className="main-content">
+    <div className="app-container">
+      {/* Main Tab Content */}
+      <main style={{ flex: 1 }}>
         {activeTab === 'dashboard' && (
           <Dashboard
+            user={currentUser}
             errors={errors}
-            onOpenAddModal={() => setIsAddModalOpen(true)}
-            onOpenQuizModal={() => setIsQuizModalOpen(true)}
+            onOpenAddModal={handleOpenAdd}
             onSelectError={(err) => setSelectedError(err)}
+            onViewAllErrors={() => setActiveTab('errors')}
+            onToggleFavorite={handleToggleFavorite}
           />
         )}
 
-        {activeTab === 'my-errors' && (
+        {activeTab === 'errors' && (
           <MyErrors
             errors={errors}
-            onOpenAddModal={() => setIsAddModalOpen(true)}
-            onOpenQuizModal={() => setIsQuizModalOpen(true)}
             onSelectError={(err) => setSelectedError(err)}
-            onDeleteMultiple={handleDeleteMultipleErrors}
-            onToggleMultipleFavorites={handleToggleMultipleFavorites}
+            onOpenAddModal={() => handleOpenAdd('text')}
+            onOpenQuiz={() => setIsQuizModalOpen(true)}
+            onToggleFavorite={handleToggleFavorite}
+            onDeleteError={handleDeleteError}
           />
         )}
 
         {activeTab === 'profile' && (
           <Profile
+            user={currentUser}
             errors={errors}
-            onOpenPdfModal={() => setIsPdfModalOpen(true)}
-            onOpenAuthModal={() => setIsAuthModalOpen(true)}
             theme={theme}
-            setTheme={handleThemeChange}
+            onSetTheme={handleSetTheme}
+            onLogout={() => {
+              authService.logout();
+              setCurrentUser(null);
+            }}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
           />
         )}
       </main>
 
-      <BottomNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        errorCount={errors.length}
-      />
+      {/* Persistent Mobile Bottom Navigation */}
+      <BottomNav activeTab={activeTab} onChangeTab={(tab) => setActiveTab(tab)} />
 
-      {/* Modals */}
+      {/* Soru Ekleme & Fotoğraf Çekme Modalı */}
       <AddQuestionModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onSave={handleSaveAnalysis}
+        onSave={handleSaveAnalyzedQuestion}
         existingErrors={errors}
+        initialMode={addModalMode}
       />
 
-      <CustomQuizModal
-        isOpen={isQuizModalOpen}
-        onClose={() => setIsQuizModalOpen(false)}
-        errors={errors}
-      />
-
+      {/* Soru Detay Modalı */}
       {selectedError && (
         <QuestionDetailModal
           errorItem={selectedError}
@@ -152,16 +192,21 @@ export function App() {
         />
       )}
 
-      <PdfExportModal
-        isOpen={isPdfModalOpen}
-        onClose={() => setIsPdfModalOpen(false)}
-        errors={errors}
-      />
-
+      {/* Giriş / Hesap Değiştirme Modalı */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
-        onSuccess={() => {}}
+        onSuccess={(user) => {
+          if (user) setCurrentUser(user);
+          setIsAuthModalOpen(false);
+        }}
+      />
+
+      {/* 🎯 Kişiselleştirilmiş Özel Hata Sınavı Modalı */}
+      <CustomQuizModal
+        isOpen={isQuizModalOpen}
+        onClose={() => setIsQuizModalOpen(false)}
+        errors={errors}
       />
     </div>
   );
