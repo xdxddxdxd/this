@@ -84,29 +84,58 @@ function levenshteinDistance(a: string, b: string): number {
   return dp[m][n];
 }
 
-const MASTER_SYSTEM_PROMPT = `Sen Türk Dil Kurumu (TDK) Yazım Kılavuzu ve ÖSYM Türkiye YKS/TYT/ÖSS Türkçe Sınavları Başuzmanısın.
+const MASTER_SYSTEM_PROMPT = `Sen Türk Dil Kurumu (TDK) Güncel Yazım Kılavuzu ve ÖSYM Türkiye YKS / TYT / KPSS Türkçe Sınavları Kıdemli Başuzmanısın.
 
 GÖREVİN:
-Verilen çoktan seçmeli sorudaki 5 seçeneği (A, B, C, D, E) dikkatle inceleyip, YAZIM YANLIŞI OLAN TEK SEÇENEĞİ bulmak, hatalı kelimeyi ve TDK kurallarına göre doğru yazılışını tespit etmektir.
+Verilen çoktan seçmeli sorudaki 5 seçeneği (A, B, C, D, E) son derece titizlikle inceleyip, YAZIM YANLIŞI OLAN TEK SEÇENEĞİ bulmak, hatalı kelimeyi ve TDK kurallarına göre doğru yazılışını tespit etmektir.
 
-KRİTİK ANALİZ İLKELERİ:
-1. SADECE YAZIM KURALI HATASINA ODAKLAN:
-   - Bu bir yazım yanlışı sorusudur. Asla anlatım bozukluğu, cümle anlamı, kelime tercihi veya olumsuz emir kipine ('övününüz' yerine 'övünmeyin' demek gibi) girme!
-   - Cümlenin ilk harfi her zaman büyük yazılır ('Kuşkonmaz saksıda...', 'Antrenör bugünkü...'). Cümle başındaki sözcüğü asla "küçük yazılmalıydı" diyerek hata sayma!
+KRİTİK ANALİZ VE DİL BİLGİSİ İLKELERİ:
 
-2. ÖSYM VE TDK TEST KURALLARI REHBERİ:
-   - BİRLEŞİK FİİLLERDE SES OLAYI: 'etmek, olmak' ile kurulanlarda ses düşmesi veya türemesi VARSA bitişik ('şükretti', 'sabretti', 'zehretti', 'azmetti', 'devretti', 'kayboldu' DOĞRUDUR), ses olayı YOKSA ayrı yazılır ('ayırt etmek', 'fark etmek', 'terk etmek', 'arz etmek' DOĞRUDUR). 'ayırtetmek' BİTİŞİK YAZILAMAZ, YAZIM YANLIŞIDIR!
-   - GEREKSİZ ÜNLÜ DARALMASI: '-yor' eki dışındaki eklerde (-a/-e ile biten fiillerde) daralma yapılmaz: 'kanıtlayamadı' DOĞRU ('kanıtlıyamadı' YANLIŞ), 'oyalayacak' DOĞRU ('oyalıyacak' YANLIŞ), 'başlayacak' DOĞRU ('başlıyacak' YANLIŞ).
-   - ÜNSÜZ BENZEŞMESİ (SERTLEŞMESİ): Sert ünsüzle (f, s, t, k, ç, ş, h, p) biten kelimeden sonra gelen 'c, d, g' harfleri sertleşir: 'değişkenlik' DOĞRU ('değişgenlik' YANLIŞ), 'çiçekçinin' DOĞRU ('çiçekcinin' YANLIŞ), 'bitkidir' DOĞRU ('bitgidir' YANLIŞ).
-   - '-SEVER' EKİ: Her zaman BİTİŞİK yazılır: 'konukseverliğidir' DOĞRU ('konuk severliğidir' YANLIŞ), 'vatansever', 'kitapsever', 'sanatsever'.
-   - 'öğütmek' FİİLİ: 'ğ' ile yazılır: 'öğütülürdü' DOĞRU ('övütülürdü' YANLIŞ).
-   - BATILI SÖZCÜKLERDE İKİ ÜNSÜZ ARASI: Başta veya ortada çift ünsüz arasına sesli girmez: 'antrenör' DOĞRU ('antırenör' YANLIŞ), 'stüdyo' DOĞRU ('sitüdyo' YANLIŞ), 'kral' DOĞRU ('kıral' YANLIŞ).
-   - ÖZEL İSİMLER & TÜR ADLARI: Özel isimden sonra gelen tür adı küçük yazılır: 'Anadolu estetiği' ('estetik' küçük harftir, 'Anadolu Estetiği' YAZIM YANLIŞIDIR). 'Doğu / Batı' medeniyet veya düşünce anlamındaysa BÜYÜK yazılır ('Doğu felsefesi' DOĞRUDUR).
-   - BAĞLAÇ OLAN 'da / de': Cümleden çıkarılınca anlam bozulmaz, her zaman AYRI yazılır: 'yarın da' DOĞRU ('yarında' YANLIŞ).
-   - SOMUT YER BİLDİRMEYEN 'ALT, ÜST, ÜZERİ': BİTİŞİK yazılır: 'akşamüstü', 'ayaküstü', 'suçüstü', 'bilinçaltı'.
-   - 'altüst etmek', 'altüst olmak' BİTİŞİK yazılır.
+1. BİRLEŞİK FİİLLERDE SES OLAYI KURALI (HAYATİ DERECE ÖNEMLİ):
+   a) Ünlü Düşmesi veya Ünsüz Türemesi Olanlar BİTİŞİK YAZILIR (KESİNLİKLE DOĞRUDUR, ASLA HATA SAYMA!):
+      - 'zehretti' (zehir + etti -> ünlü düşmesi var, BİTİŞİK DOĞRUDUR. ASLA "zehir etti olmalıydı" diyerek hata sayma!)
+      - 'şükretti' (şükür + etti -> ünlü düşmesi var, BİTİŞİK DOĞRUDUR)
+      - 'sabretti' (sabır + etti -> ünlü düşmesi var, BİTİŞİK DOĞRUDUR)
+      - 'azmetti' (azim + etti -> ünlü düşmesi var, BİTİŞİK DOĞRUDUR)
+      - 'devretti', 'emretti', 'kayboldu', 'kaybetti', 'hapsetti', 'kahretti', 'keşfetti', 'lütfetti', 'nakletti', 'hükmetti', 'zannetti', 'hissetti', 'reddetti', 'affetti', 'halletti' BİTİŞİK YAZILIR VE %100 DOĞRUDUR.
+   b) Ses Olayı OLMAYANLAR DAİMA AYRI YAZILIR (Bitişik Yazılırsa KESİNLİKLE YAZIM YANLIŞIDIR!):
+      - 'ayırtetmemizi' / 'ayırtetmek' ➔ YAZIM YANLIŞIDIR! Doğrusu 'ayırt etmemizi' / 'ayırt etmek' olmalıdır.
+      - 'farketti' / 'farketmek' ➔ YAZIM YANLIŞIDIR! Doğrusu 'fark etti' / 'fark etmek' olmalıdır.
+      - 'terketti' / 'terketmek' ➔ YAZIM YANLIŞIDIR! Doğrusu 'terk etti' / 'terk etmek' olmalıdır.
+      - 'arzetti' / 'arzetmek' ➔ YAZIM YANLIŞIDIR! Doğrusu 'arz etti' / 'arz etmek' olmalıdır.
+      - 'haketti' / 'haketmek' ➔ YAZIM YANLIŞIDIR! Doğrusu 'hak etti' / 'hak etmek' olmalıdır.
+      - 'sağol' ➔ YAZIM YANLIŞIDIR! Doğrusu 'sağ ol' olmalıdır.
 
-STANDART 10 TYT KURAL KATEGORİSİ (rule_category alanı YALNIZCA bu 10 başlıktan biri olmalıdır):
+2. ÜNSÜZ BENZEŞMESİ (SERTLEŞMESİ) & FISTIKÇI ŞAHAP:
+   - Türkçe sert ünsüzler: f, s, t, k, ç, ş, h, p (FıSTıKÇı ŞaHaP).
+   - 'ş' HARFİ SERT BİR ÜNSÜZDÜR! 'değiş-' fiili sert ünsüz 'ş' ile bittiği için '-gen' eki sertleşerek '-ken' (değişkenlik) olur: 'değişgenlik' YAZIM YANLIŞIDIR, 'değişkenlik' DOĞRUDUR.
+   - Açıklamalarında ve koç notlarında 'ş' harfinin sert ünsüz olduğunu daima doğru ve bilimsel açıkla.
+
+3. GEREKSİZ ÜNLÜ DARALMASI:
+   - Sadece şimdiki zaman eki '-yor' daralma yapar. '-ama/-eme', '-acak/-ecek' gibi eklerde daralma YAPILMAZ!
+   - 'kanıtlıyamadı' ➔ YAZIM YANLIŞIDIR! Doğrusu 'kanıtlayamadı' olmalıdır.
+   - 'oyalıyacak' ➔ YAZIM YANLIŞIDIR! Doğrusu 'oyalayacak' olmalıdır.
+   - 'başlıyacak' ➔ YAZIM YANLIŞIDIR! Doğrusu 'başlayacak' olmalıdır.
+
+4. BATILI SÖZCÜKLERDE İKİ ÜNSÜZ ARASI:
+   - Başta veya ortada çift ünsüz arasına sesli girmez:
+   - 'antırenör' ➔ YAZIM YANLIŞIDIR! Doğrusu 'antrenör' olmalıdır.
+   - 'sitüdyo' ➔ YAZIM YANLIŞIDIR! Doğrusu 'stüdyo' olmalıdır.
+   - 'kıral' ➔ YAZIM YANLIŞIDIR! Doğrusu 'kral' olmalıdır.
+
+5. BAĞLAÇ OLAN 'da / de':
+   - Cümleden çıkarılınca anlam bozulmaz, daima AYRI yazılır: 'yarında' ➔ YAZIM YANLIŞIDIR! Doğrusu 'yarın da' olmalıdır.
+
+6. CÜMLE BAŞI VE ÖZEL ADLAR:
+   - Cümle başındaki kelime daima büyük başlar. Asla cümle başındaki kelimeyi "küçük yazılmalıydı" diyerek hata sayma!
+   - Asla anlatım bozukluğu veya kelime tercihi gibi konulara girme; SADECE YAZIM KURALI HATASINI BUL!
+
+7. PEDAGOJİK KOÇ NOTU (coach_note) ÜRETİM REHBERİ:
+   - Koç notunu bir özel ders öğretmeninin öğrenciye fısıldadığı akılda kalıcı bir taktik veya hafıza kodu (Mnemonic) gibi yaz.
+   - Önemli anahtar kelimeleri tek tırnak içine al (örn: 'fark etmek', 'SOMBAHÇEMİ', 'FıSTıKÇı ŞaHaP').
+   - Asla genel-geçer ve sıkıcı "Bu kurala dikkat edin" gibi cümleler kurma!
+
+STANDART 10 TYT KURAL KATEGORİSİ (rule_category YALNIZCA bu 10 başlıktan biri olmalıdır):
 1. "Büyük Harflerin Yazımı"
 2. "Bitişik Yazılan Birleşik Kelimeler"
 3. "Ayrı Yazılan Kelimeler"
@@ -118,7 +147,7 @@ STANDART 10 TYT KURAL KATEGORİSİ (rule_category alanı YALNIZCA bu 10 başlık
 9. "Ses Olayları ve Yardımcı Fiiller"
 10. "Düzeltme İşareti (Şapka ^)"
 
-JSON FORMATI:
+JSON FORMATI (Eksiksiz JSON döndür):
 {
   "question_text": "Soru metni",
   "options": {
@@ -132,8 +161,8 @@ JSON FORMATI:
   "wrong_word": "ayırtetmemizi",
   "correct_word": "ayırt etmemizi",
   "rule_category": "Ayrı Yazılan Kelimeler",
-  "explanation": "TDK kuralına göre ses düşmesi veya türemesi olmayan birleşik fiiller ayrı yazılır.",
-  "coach_note": "'ayırt etmek', 'fark etmek', 'terk etmek' gibi birleşik fiillerde ses olayı olmadığı için daima ayrı yazılır!",
+  "explanation": "TDK kuralına göre ses düşmesi veya türemesi olmayan birleşik fiiller daima ayrı yazılır.",
+  "coach_note": "Taktik: 'etmek' ve 'olmak' fiillerinde ses düşmesi (sabretmek) veya türemesi (hissetmek) yoksa daima AYRI yazılır: 'ayırt etmek', 'fark etmek', 'terk etmek'!",
   "difficulty_score": 6
 }`;
 
@@ -308,11 +337,36 @@ export const groqService = {
       parsed.correct_word = parsed.correct_word.replace(/^[\.,:;"'“”‘’\(\)]+|[\.,:;"'“”‘’\(\)]+$/g, '').trim();
     }
 
-    // 1. Check for hallucination / extreme word mismatch (e.g. "başpıtrak" -> "simit")
+    // 1. TDK Verified Deterministic Engine Pre-Check across Options
+    const verifiedMatch = tdkService.findErrorInOptions(parsed.options || {});
+    if (verifiedMatch) {
+      // If LLM picked an incorrect option OR hallucinated on a valid word (like zehretti)
+      const isLLMHallucination = parsed.wrong_word && tdkService.isKnownCorrectWord(parsed.wrong_word);
+      if (isLLMHallucination || parsed.wrong_option !== verifiedMatch.wrongOption) {
+        parsed.wrong_option = verifiedMatch.wrongOption;
+        parsed.wrong_word = verifiedMatch.wrongWord;
+        parsed.correct_word = verifiedMatch.correctWord;
+        parsed.rule_category = verifiedMatch.category;
+        parsed.explanation = verifiedMatch.explanation;
+        parsed.coach_note = verifiedMatch.coachNote;
+      }
+    } else if (parsed.wrong_word && tdkService.isKnownCorrectWord(parsed.wrong_word)) {
+      // LLM picked a known correct word as an error (False Positive)
+      console.warn('Blocked false positive on correct TDK word:', parsed.wrong_word);
+      const fixed = this.inspectOptionsLocally(parsed.options || {}, rawText);
+      if (fixed) {
+        parsed.wrong_option = fixed.wrong_option;
+        parsed.wrong_word = fixed.wrong_word;
+        parsed.correct_word = fixed.correct_word;
+        parsed.rule_category = fixed.rule_category;
+        parsed.explanation = fixed.explanation;
+      }
+    }
+
+    // 2. Check for hallucination / extreme word mismatch (e.g. "başpıtrak" -> "simit")
     if (parsed.wrong_word && parsed.correct_word) {
       const dist = levenshteinDistance(parsed.wrong_word, parsed.correct_word);
       const maxLen = Math.max(parsed.wrong_word.length, parsed.correct_word.length);
-      // If words differ completely and length > 4 with high edit distance
       if (maxLen > 4 && dist > maxLen * 0.6 && !parsed.wrong_word.includes(' ') && !parsed.correct_word.includes(' ')) {
         console.warn('Possible hallucination detected:', parsed.wrong_word, '->', parsed.correct_word);
         const fixed = this.inspectOptionsLocally(parsed.options || {}, rawText);
@@ -326,7 +380,7 @@ export const groqService = {
       }
     }
 
-    // 2. Prevent identical wrong_word and correct_word
+    // 3. Prevent identical wrong_word and correct_word
     if (
       !parsed.wrong_word ||
       !parsed.correct_word ||
@@ -342,28 +396,24 @@ export const groqService = {
       }
     }
 
-    // 3. Strictly Normalize Category to Canonical 10 TYT Categories
+    // 4. Strictly Normalize Category to Canonical 10 TYT Categories
     parsed.rule_category = normalizeCategory(parsed.rule_category);
 
-    // 4. Verify the CORRECT word against TDK Sözlük (forward verification)
-    if (parsed.correct_word) {
-      try {
-        const tdkCheck = await tdkService.verifyWithTdk(parsed.correct_word);
-        if (tdkCheck.isValid && tdkCheck.correctForm) {
-          parsed.correct_word = tdkCheck.correctForm;
-        }
-      } catch (err) {
-        console.warn('TDK verification check skipped:', err);
-      }
-    }
+    // 5. Sanitize Coach Note for Linguistic & Phonetic Accuracy
+    parsed.coach_note = tdkService.sanitizeCoachNote(
+      parsed.coach_note,
+      parsed.wrong_word,
+      parsed.correct_word,
+      parsed.rule_category
+    );
 
-    // 5. Compute coach note from historical weak spots
+    // 6. Compute coach note from historical weak spots if applicable
     const sameRuleCount = existingUserErrors.filter(
       e => (e.rule_category || '').toLocaleLowerCase('tr-TR') === (parsed.rule_category || '').toLocaleLowerCase('tr-TR')
     ).length;
 
-    if (sameRuleCount >= 2) {
-      parsed.coach_note = `Bu kuralı (${parsed.rule_category}) bu ay ${sameRuleCount + 1}. kez karıştırdın. Kısa bir tekrar sınavda net kazandırır!`;
+    if (sameRuleCount >= 2 && !parsed.coach_note.includes('bu ay')) {
+      parsed.coach_note = `${parsed.coach_note} (Bu kuralı bu ay ${sameRuleCount + 1}. kez karıştırdın!)`;
     }
 
     return parsed;
@@ -481,6 +531,7 @@ export const groqService = {
 
   /**
    * Generates authentic, dynamic, 100% unique 5-option TYT questions using Groq / OpenRouter LLaMA 3.3 70B
+   * Uses parallel micro-batches (3-4 questions per chunk) to eliminate timeouts and speed up generation
    */
   async generateAIQuestionsBatch(
     targets: { wrong_word: string; correct_word: string; category: string }[],
@@ -489,9 +540,12 @@ export const groqService = {
   ): Promise<any[]> {
     if (!targets || targets.length === 0) return [];
 
-    const promptItems = targets.map((t, idx) => 
-      `Soru ${idx + 1}: Yanlış yazılan kelime: "${t.wrong_word}", Doğru yazılışı: "${t.correct_word}", Kural kategorisi: "${t.category}"`
-    ).join('\n');
+    // Split targets into micro-chunks of 3 questions to run in parallel
+    const CHUNK_SIZE = 3;
+    const chunks: { wrong_word: string; correct_word: string; category: string }[][] = [];
+    for (let i = 0; i < targets.length; i += CHUNK_SIZE) {
+      chunks.push(targets.slice(i, i + CHUNK_SIZE));
+    }
 
     const inspirationBlock = inspirationSnippets.length > 0
       ? `\nÖĞRENCİNİN KENDİ SORU HAVUZUNDAN ESİNLENME VE BAĞLAM REFERANSLARI:
@@ -499,26 +553,29 @@ ${inspirationSnippets.slice(0, 6).map((s, i) => `${i + 1}. "${s}"`).join('\n')}
 TALİMAT: Yukarıdaki referans cümlelerin edebi üslubundan, kelime zenginliğinden ve temalarından esinlenerek yepyeni, özgün cümleler kur.\n`
       : '';
 
-    const systemPrompt = `Sen Türkiye'nin en iyi TYT Türkçe Soru Yazarı ve TDK Kural Uzmanısın.
+    const systemPrompt = `Sen Türkiye'nin en seçkin TYT/YKS Türkçe Soru Yazarı ve TDK Yazım Kılavuzu Başuzmanısın.
 
 GÖREVİN:
-Verilen hedefler için ÖSYM / MEB standartlarında, 5 seçenekli (A, B, C, D, E) ÖZGÜN, YEPYENİ ve EDEBİ Türkçe yazım kuralları soruları üretmektir.
+Verilen hedefler için ÖSYM / MEB standartlarında, 5 seçenekli (A, B, C, D, E) ÖZGÜN, YEPYENİ, EDEBİ ve AKADEMİK Türkçe yazım kuralları soruları üretmektir.
 ${inspirationBlock}
-KRİTİK KURALLAR:
+KRİTİK SORU ÜRETİM KURALLARI:
 1. TEK HATA KURALI: Her soruda KESİNLİKLE sadece ve sadece 1 adet yazım yanlışı bulunmalıdır. O yanlış da belirtilen hedef kelimedir.
-2. DİĞER 4 ŞIK: Diğer 4 seçenek kesinlikle ve şüphesizce %100 YAZIM YANLIŞSIZ, kusursuz, doğal, edebi/akademik Türkçe cümleler olmalıdır. Cümleler birbirini tekrar etmemeli, her seferinde yaratıcı ve özgün olmalıdır.
-3. RASTGELE ŞIK: Hatalı şıkkın harfi (A, B, C, D veya E) her soruda rastgele dağıtılmalıdır.
-4. ZORLUK SEVİYESİ: ${difficulty.toUpperCase()} (kolay: günlük sade dil; orta: TYT deneme standartı; zor: ÖSYM çeldiricili edebi/akademik metin).
+2. DİĞER 4 ŞIKTA HİÇBİR YAZIM YANLIŞI OLMAMALIDIR (KUSURSUZ ÇELDİRİCİLER):
+   - Diğer 4 seçenek kesinlikle ve şüphesizce %100 YAZIM YANLIŞSIZ, noktalama ve imla açısından kusursuz, doğal, edebi veya bilimsel Türkçe cümleler olmalıdır.
+   - 5 seçeneğin tamamı birbirinden tamamen farklı cümleler olmalıdır; kesinlikle aynı cümleyi şıklara kopyalama!
+3. RASTGELE ŞIK DAĞILIMI: Hatalı şıkkın harfi (A, B, C, D veya E) her soruda rastgele dağıtılmalıdır.
+4. ZORLUK SEVİYESİ: ${difficulty.toUpperCase()} (kolay: günlük akıcı dil; orta: TYT deneme sınavı standartı; zor: ÖSYM çeldiricili edebi/akademik metin).
 5. CÜMLE BAŞI BÜYÜK HARF KURALI (HAYATİ ÖNEMDE):
    - Türkçede her cümle kural gereği BÜYÜK HARFLE başlar.
    - Eğer hedef kelimenin yanlışı "küçük harfle yazılması gereken bir unvan, meslek, akrabalık adı veya yön adının büyük yazılması" ise (örn: "Kaymakam" -> "kaymakam", "Doktor" -> "doktor", "Teyze" -> "teyze", "Batı" -> "batı"):
-     BU KELİMEYİ KESİNLİKLE CÜMLE BAŞINA KOYMA! Çünkü cümle başındaki her kelime zaten büyük harfle başlar ve bu bir hata sayılmaz.
-     Bu tür kelimeleri MUTLAKA cümlenin ortasına veya sonuna yerleştir (Örn: "Dün kasabaya gelen Kaymakam beyi herkes karşıladı." ➔ 'Kaymakam' ortada olduğu için yazım yanlışıdır).
-6. DERİNLEMESİNE VE ÖZGÜN KOÇ NOTU (coach_note):
-   - Asla "Bu kurala dikkat edin", "Büyük harfleri iyi öğrenin" gibi genel-geçer ve jenerik cümleler YAZMA!
+     BU KELİMEYİ KESİNLİKLE CÜMLE BAŞINA KOYMA! Cümlenin ortasına veya sonuna yerleştir (Örn: "Dün kasabaya gelen Kaymakam beyi herkes karşıladı." ➔ 'Kaymakam' ortada olduğu için yazım yanlışıdır).
+6. BİRLEŞİK FİİLLERDE SES OLAYI DOĞRULUĞU:
+   - 'zehretti', 'sabretti', 'şükretti', 'azmetti', 'kayboldu' sözcüklerinde ünlü düşmesi olduğu için bitişik yazılır ve %100 DOĞRUDUR. Bu kelimeleri asla yanlış şık olarak üretme!
+   - Ses olayı olmayan 'ayırt etmek', 'fark etmek', 'terk etmek', 'arz etmek', 'hak etmek' fiillerinin bitişik yazılması ('ayırtetmek', 'farketti') ise yazım yanlışıdır.
+7. DERİNLEMESİNE VE ÖZGÜN KOÇ NOTU (coach_note):
+   - Asla "Bu kurala dikkat edin" gibi genel-geçer ve jenerik cümleler YAZMA!
    - Her soru için doğrudan o kelimeye ve kurala özel bir ÖĞRETMEN TAKTİĞİ, ÖSYM TUZAĞI ÇÖZÜMÜ ve HAFIZA KODLAMASI (Mnemonic) yaz.
-   - Örneğin 'terketti' için: "'Etmek' yardımcı fiilinde ses düşmesi veya türemesi yoksa ayrı yazılır. Ayrı okuyabildiğin her birleşik fiili ayrı yazmayı unutma!"
-   - Örneğin 'akşam üzeri' için: "Somut fiziksel yer bildirmeyen 'alt, üst, üzeri' sözcükleri (akşamüzeri, ayaküstü, suçüstü) mecazlaşıp kalıplaştığı için bitişik yazılır!"
+   - Anahtar kavramları tek tırnak içine al (örn: 'fark etmek', 'SOMBAHÇEMİ', 'FıSTıKÇı ŞaHaP').
 
 ÇIKTI FORMATI:
 Sadece şu JSON nesnesini döndür:
@@ -534,65 +591,83 @@ Sadece şu JSON nesnesini döndür:
         "E": "Cümle metni..."
       },
       "wrong_option": "C",
-      "wrong_word": "...",
-      "correct_word": "...",
-      "rule_category": "...",
-      "explanation": "TDK kural gerekçesi",
-      "coach_note": "O kelimeye ve kurala özel taktiksel, derinlemesine öğretmen koç notu"
+      "wrong_word": "ayırtetmemizi",
+      "correct_word": "ayırt etmemizi",
+      "rule_category": "Ayrı Yazılan Kelimeler",
+      "explanation": "TDK kuralına göre ses düşmesi veya türemesi olmayan birleşik fiiller daima ayrı yazılır.",
+      "coach_note": "Taktik: 'etmek' yardımcı fiilinde ses olayı yoksa ayrı yazılır: 'ayırt etmek', 'fark etmek', 'terk etmek'!"
     }
   ]
 }`;
 
-    const makeCall = async (endpoint: string, key: string, model: string, extraHeaders = {}) => {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        signal: AbortSignal.timeout(20000),
-        headers: {
-          'Authorization': `Bearer ${key}`,
-          'Content-Type': 'application/json',
-          ...extraHeaders
-        },
-        body: JSON.stringify({
-          model,
-          response_format: { type: 'json_object' },
-          temperature: 0.7, // Creative generation for unique non-repetitive sentences
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Lütfen şu ${targets.length} adet soru için TYT sınav sorularını üret:\n${promptItems}` }
-          ]
-        })
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      const rawContent = data.choices?.[0]?.message?.content || '{}';
-      return JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+    const makeSingleChunkCall = async (chunk: typeof targets): Promise<any[]> => {
+      const promptItems = chunk.map((t, idx) => 
+        `Soru ${idx + 1}: Yanlış yazılan kelime: "${t.wrong_word}", Doğru yazılışı: "${t.correct_word}", Kural kategorisi: "${t.category}"`
+      ).join('\n');
+
+      const executeCall = async (endpoint: string, key: string, model: string, extraHeaders = {}) => {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          signal: AbortSignal.timeout(25000),
+          headers: {
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            ...extraHeaders
+          },
+          body: JSON.stringify({
+            model,
+            response_format: { type: 'json_object' },
+            temperature: 0.7,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Lütfen şu ${chunk.length} adet soru için TYT sınav sorularını üret:\n${promptItems}` }
+            ]
+          })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const rawContent = data.choices?.[0]?.message?.content || '{}';
+        const parsed = JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+        return Array.isArray(parsed?.questions) ? parsed.questions : [];
+      };
+
+      // 1. Tier 1: Groq LLaMA-3.3-70B
+      if (GROQ_API_KEY) {
+        try {
+          const res = await executeCall('https://api.groq.com/openai/v1/chat/completions', GROQ_API_KEY, 'llama-3.3-70b-versatile');
+          if (res.length > 0) return res;
+        } catch (err) {
+          console.warn('Groq chunk failed, trying OpenRouter fallback...', err);
+        }
+      }
+
+      // 2. Tier 2: OpenRouter LLaMA-3.3-70B
+      if (OPENROUTER_API_KEY) {
+        try {
+          const res = await executeCall('https://openrouter.ai/api/v1/chat/completions', OPENROUTER_API_KEY, 'meta-llama/llama-3.3-70b-instruct', {
+            'HTTP-Referer': 'http://localhost:3000',
+            'X-Title': 'TDK TYT Master'
+          });
+          if (res.length > 0) return res;
+        } catch (err) {
+          console.warn('OpenRouter chunk failed:', err);
+        }
+      }
+
+      return [];
     };
 
-    try {
-      if (GROQ_API_KEY) {
-        const res = await makeCall('https://api.groq.com/openai/v1/chat/completions', GROQ_API_KEY, 'llama-3.3-70b-versatile');
-        if (res && Array.isArray(res.questions) && res.questions.length > 0) {
-          return res.questions;
-        }
-      }
-    } catch (err) {
-      console.warn('Groq quiz generation failed, trying OpenRouter:', err);
-    }
+    // Run all chunks in parallel for maximum speed (e.g. 15 questions take ~3-4s total)
+    const chunkPromises = chunks.map(chunk => makeSingleChunkCall(chunk));
+    const results = await Promise.allSettled(chunkPromises);
 
-    try {
-      if (OPENROUTER_API_KEY) {
-        const res = await makeCall('https://openrouter.ai/api/v1/chat/completions', OPENROUTER_API_KEY, 'meta-llama/llama-3.3-70b-instruct', {
-          'HTTP-Referer': 'http://localhost:3000',
-          'X-Title': 'TDK TYT Master'
-        });
-        if (res && Array.isArray(res.questions) && res.questions.length > 0) {
-          return res.questions;
-        }
+    const allQuestions: any[] = [];
+    results.forEach((res) => {
+      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+        allQuestions.push(...res.value);
       }
-    } catch (err) {
-      console.warn('OpenRouter quiz generation failed:', err);
-    }
+    });
 
-    return [];
+    return allQuestions;
   }
 };
