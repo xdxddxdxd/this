@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { User, UserError, AnalysisResult } from './types';
 import { authService } from './services/authService';
 import { errorService } from './services/errorService';
@@ -6,14 +6,16 @@ import { Dashboard } from './components/Dashboard';
 import { MyErrors } from './components/MyErrors';
 import { Profile } from './components/Profile';
 import { BottomNav } from './components/BottomNav';
-import { AddQuestionModal } from './components/AddQuestionModal';
 import { QuestionDetailModal } from './components/QuestionDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { OnboardingView } from './components/OnboardingView';
 import { CustomQuizModal } from './components/CustomQuizModal';
 
+const AddQuestionModal = lazy(() => import('./components/AddQuestionModal').then((module) => ({ default: module.AddQuestionModal })));
+
 export function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => authService.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'errors' | 'profile'>('dashboard');
   const [errors, setErrors] = useState<UserError[]>([]);
   const [isLoadingErrors, setIsLoadingErrors] = useState(true);
@@ -60,6 +62,26 @@ export function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
 
+  useEffect(() => {
+    let mounted = true;
+    authService.getCurrentUser().then((user) => {
+      if (mounted) {
+        setCurrentUser(user);
+        setIsAuthLoading(false);
+      }
+    });
+    const subscription = authService.onAuthStateChange((user) => {
+      if (mounted) {
+        setCurrentUser(user);
+        setIsAuthLoading(false);
+      }
+    });
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
   // Load user errors on mount or when user changes
   useEffect(() => {
     if (currentUser) {
@@ -68,6 +90,9 @@ export function App() {
         setErrors(data);
         setIsLoadingErrors(false);
       });
+    } else {
+      setErrors([]);
+      setIsLoadingErrors(false);
     }
   }, [currentUser]);
 
@@ -125,8 +150,12 @@ export function App() {
   };
 
   // If no user is logged in, show direct Onboarding & Login screen
+  if (isAuthLoading) {
+    return <div className="app-container" aria-busy="true" />;
+  }
+
   if (!currentUser) {
-    return <OnboardingView onSuccess={(user: any) => setCurrentUser(user)} />;
+    return <OnboardingView onSuccess={setCurrentUser} theme={theme} onToggleTheme={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')} />;
   }
 
   return (
@@ -161,11 +190,15 @@ export function App() {
             errors={errors}
             theme={theme}
             onSetTheme={handleSetTheme}
-            onLogout={() => {
-              authService.logout();
-              setCurrentUser(null);
+            onLogout={async () => {
+              try {
+                await authService.logout();
+                setCurrentUser(null);
+              } catch {
+                // The current session remains active if Supabase rejects logout.
+              }
             }}
-            onOpenAuth={() => setIsAuthModalOpen(true)}
+            onOpenAuth={() => authService.logout().then(() => setCurrentUser(null)).catch(() => undefined)}
           />
         )}
       </main>
@@ -174,13 +207,17 @@ export function App() {
       <BottomNav activeTab={activeTab} onChangeTab={(tab) => setActiveTab(tab)} />
 
       {/* Soru Ekleme & Fotoğraf Çekme Modalı */}
-      <AddQuestionModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSave={handleSaveAnalyzedQuestion}
-        existingErrors={errors}
-        initialMode={addModalMode}
-      />
+      {isAddModalOpen && (
+        <Suspense fallback={null}>
+          <AddQuestionModal
+            isOpen={isAddModalOpen}
+            onClose={() => setIsAddModalOpen(false)}
+            onSave={handleSaveAnalyzedQuestion}
+            existingErrors={errors}
+            initialMode={addModalMode}
+          />
+        </Suspense>
+      )}
 
       {/* Soru Detay Modalı */}
       {selectedError && (
