@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import {
   Printer,
   Sliders,
@@ -11,15 +11,15 @@ import {
   Award
 } from 'lucide-react';
 import { User, UserError } from '../types';
-import { PdfExportModal } from './PdfExportModal';
+const PdfExportModal = lazy(() => import('./PdfExportModal').then((module) => ({ default: module.PdfExportModal })));
 
 interface ProfileProps {
   user: User;
   errors: UserError[];
   theme: 'dark' | 'light';
   onSetTheme: (theme: 'dark' | 'light') => void;
-  onLogout: () => void;
-  onOpenAuth: () => void;
+  onLogout: () => void | Promise<void>;
+  onOpenAuth: () => void | Promise<void>;
 }
 
 export const Profile: React.FC<ProfileProps> = ({
@@ -262,12 +262,11 @@ export const Profile: React.FC<ProfileProps> = ({
       </button>
 
       {/* PDF Export Modal */}
-      <PdfExportModal
-        isOpen={isPdfModalOpen}
-        onClose={() => setIsPdfModalOpen(false)}
-        user={user}
-        errors={errors}
-      />
+      {isPdfModalOpen && (
+        <Suspense fallback={null}>
+          <PdfExportModal isOpen={isPdfModalOpen} onClose={() => setIsPdfModalOpen(false)} user={user} errors={errors} />
+        </Suspense>
+      )}
     </div>
   );
 };
