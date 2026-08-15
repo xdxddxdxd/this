@@ -6,68 +6,117 @@ const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
-const MASTER_SYSTEM_PROMPT = `Sen Türk Dil Kurumu (TDK) Yazım Kılavuzu ve ÖSYM Türkiye YKS/TYT Türkçe sınavları başuzmanısın.
+export const CANONICAL_TYT_CATEGORIES = [
+  'Büyük Harflerin Yazımı',
+  'Bitişik Yazılan Birleşik Kelimeler',
+  'Ayrı Yazılan Kelimeler',
+  "Bağlaç Olan Da / De'nin Yazımı",
+  "Bağlaç Olan Ki'nin Yazımı",
+  "Soru Eki Mı / Mi'nin Yazımı",
+  'Kısaltmaların Yazımı',
+  'Tarih ve Sayıların Yazımı',
+  'Ses Olayları ve Yardımcı Fiiller',
+  'Düzeltme İşareti (Şapka ^)'
+] as const;
+
+export type CanonicalCategory = typeof CANONICAL_TYT_CATEGORIES[number];
+
+/**
+ * Normalizes any category variant to one of the 10 canonical TYT categories
+ */
+export function normalizeCategory(rawCategory: string | undefined): CanonicalCategory {
+  if (!rawCategory) return 'Ayrı Yazılan Kelimeler';
+  const lower = rawCategory.trim().toLocaleLowerCase('tr-TR');
+
+  if (lower.includes('büyük') || lower.includes('unvan') || lower.includes('kurum') || lower.includes('özel ad') || lower.includes('isimlerin')) {
+    return 'Büyük Harflerin Yazımı';
+  }
+  if (lower.includes('bitişik') || lower.includes('birleşik')) {
+    return 'Bitişik Yazılan Birleşik Kelimeler';
+  }
+  if (lower.includes('ayrı') || lower.includes('ikileme') || lower.includes('arası')) {
+    return 'Ayrı Yazılan Kelimeler';
+  }
+  if (lower.includes('da / de') || lower.includes('de bağlacı') || lower.includes('da bağlacı') || lower.includes('de / da')) {
+    return "Bağlaç Olan Da / De'nin Yazımı";
+  }
+  if (lower.includes('ki bağlacı') || lower.includes("ki'nin") || lower.includes('ki nin')) {
+    return "Bağlaç Olan Ki'nin Yazımı";
+  }
+  if (lower.includes('soru eki') || lower.includes('mı / mi') || lower.includes('mi soru')) {
+    return "Soru Eki Mı / Mi'nin Yazımı";
+  }
+  if (lower.includes('kısaltma')) {
+    return 'Kısaltmaların Yazımı';
+  }
+  if (lower.includes('tarih') || lower.includes('sayı') || lower.includes('sıra')) {
+    return 'Tarih ve Sayıların Yazımı';
+  }
+  if (lower.includes('şapka') || lower.includes('düzeltme')) {
+    return 'Düzeltme İşareti (Şapka ^)';
+  }
+  if (lower.includes('ses') || lower.includes('fiil') || lower.includes('yumuşama') || lower.includes('düşme') || lower.includes('ek')) {
+    return 'Ses Olayları ve Yardımcı Fiiller';
+  }
+
+  return 'Ayrı Yazılan Kelimeler';
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  const s1 = a.toLocaleLowerCase('tr-TR').replace(/\s+/g, '');
+  const s2 = b.toLocaleLowerCase('tr-TR').replace(/\s+/g, '');
+  const m = s1.length;
+  const n = s2.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (s1[i - 1] === s2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + 1);
+      }
+    }
+  }
+  return dp[m][n];
+}
+
+const MASTER_SYSTEM_PROMPT = `Sen Türk Dil Kurumu (TDK) Yazım Kılavuzu ve ÖSYM Türkiye YKS/TYT/ÖSS Türkçe Sınavları Başuzmanısın.
 
 GÖREVİN:
-Verilen soruyu A'dan E'ye tüm seçenekleriyle harf harf inceleyip yazım yanlışı olan tek şıkkı, hatalı kelimeyi ve TDK doğrusunu %100 doğrulukla bulmaktır.
+Verilen çoktan seçmeli sorudaki 5 seçeneği (A, B, C, D, E) dikkatle inceleyip, YAZIM YANLIŞI OLAN TEK SEÇENEĞİ bulmak, hatalı kelimeyi ve TDK kurallarına göre doğru yazılışını tespit etmektir.
 
-ÖSYM VE TDK TEST KURALLARI REHBERİ:
-1. UNVANLAR, MESLEKLER VE SAYGI SÖZLERİ:
-   - Kişi adlarından önce veya sonra gelen unvanlar, meslek adları ve saygı sözleri BÜYÜK harfle başlar: "Avukat Mehmet Bey", "Doktor Ayşe Hanım", "Kaymakam Erol Bey". ("avukat Mehmet Bey" YANLIŞTIR -> "Avukat Mehmet Bey").
-   - Akrabalık bildiren kelimeler lakap olarak kalıplaşmamışsa KÜÇÜK yazılır: "Mustafa amcam", "Fatma nine", "Ayşe teyze".
+KRİTİK ANALİZ İLKELERİ:
+1. SADECE YAZIM KURALI HATASINA ODAKLAN:
+   - Bu bir yazım yanlışı sorusudur. Asla anlatım bozukluğu, cümle anlamı, kelime tercihi veya olumsuz emir kipine ('övününüz' yerine 'övünmeyin' demek gibi) girme!
+   - Cümlenin ilk harfi her zaman büyük yazılır ('Kuşkonmaz saksıda...', 'Antrenör bugünkü...'). Cümle başındaki sözcüğü asla "küçük yazılmalıydı" diyerek hata sayma!
 
-2. GEZEGEN VE GÖK BİLİMİ ADLARI:
-   - "Dünya", "Güneş", "Ay" sözcükleri gök bilimi ve coğrafya terimi olarak kullanıldığında BÜYÜK harfle başlar ve ek kesmeyle ayrılır: "uydusu olan bir gezegen de Dünya'dır". ("dünyadır" YANLIŞTIR).
-   - Terim anlamı dışında mecaz veya genel kullanımda küçük yazılır: "dünya turu", "dünyaya açılan pencere".
+2. ÖSYM VE TDK TEST KURALLARI REHBERİ:
+   - BİRLEŞİK FİİLLERDE SES OLAYI: 'etmek, olmak' ile kurulanlarda ses düşmesi veya türemesi VARSA bitişik ('şükretti', 'sabretti', 'zehretti', 'azmetti', 'devretti', 'kayboldu' DOĞRUDUR), ses olayı YOKSA ayrı yazılır ('ayırt etmek', 'fark etmek', 'terk etmek', 'arz etmek' DOĞRUDUR). 'ayırtetmek' BİTİŞİK YAZILAMAZ, YAZIM YANLIŞIDIR!
+   - GEREKSİZ ÜNLÜ DARALMASI: '-yor' eki dışındaki eklerde (-a/-e ile biten fiillerde) daralma yapılmaz: 'kanıtlayamadı' DOĞRU ('kanıtlıyamadı' YANLIŞ), 'oyalayacak' DOĞRU ('oyalıyacak' YANLIŞ), 'başlayacak' DOĞRU ('başlıyacak' YANLIŞ).
+   - ÜNSÜZ BENZEŞMESİ (SERTLEŞMESİ): Sert ünsüzle (f, s, t, k, ç, ş, h, p) biten kelimeden sonra gelen 'c, d, g' harfleri sertleşir: 'değişkenlik' DOĞRU ('değişgenlik' YANLIŞ), 'çiçekçinin' DOĞRU ('çiçekcinin' YANLIŞ), 'bitkidir' DOĞRU ('bitgidir' YANLIŞ).
+   - '-SEVER' EKİ: Her zaman BİTİŞİK yazılır: 'konukseverliğidir' DOĞRU ('konuk severliğidir' YANLIŞ), 'vatansever', 'kitapsever', 'sanatsever'.
+   - 'öğütmek' FİİLİ: 'ğ' ile yazılır: 'öğütülürdü' DOĞRU ('övütülürdü' YANLIŞ).
+   - BATILI SÖZCÜKLERDE İKİ ÜNSÜZ ARASI: Başta veya ortada çift ünsüz arasına sesli girmez: 'antrenör' DOĞRU ('antırenör' YANLIŞ), 'stüdyo' DOĞRU ('sitüdyo' YANLIŞ), 'kral' DOĞRU ('kıral' YANLIŞ).
+   - ÖZEL İSİMLER & TÜR ADLARI: Özel isimden sonra gelen tür adı küçük yazılır: 'Anadolu estetiği' ('estetik' küçük harftir, 'Anadolu Estetiği' YAZIM YANLIŞIDIR). 'Doğu / Batı' medeniyet veya düşünce anlamındaysa BÜYÜK yazılır ('Doğu felsefesi' DOĞRUDUR).
+   - BAĞLAÇ OLAN 'da / de': Cümleden çıkarılınca anlam bozulmaz, her zaman AYRI yazılır: 'yarın da' DOĞRU ('yarında' YANLIŞ).
+   - SOMUT YER BİLDİRMEYEN 'ALT, ÜST, ÜZERİ': BİTİŞİK yazılır: 'akşamüstü', 'ayaküstü', 'suçüstü', 'bilinçaltı'.
+   - 'altüst etmek', 'altüst olmak' BİTİŞİK yazılır.
 
-3. BELİRLİ TARİHLER VE AY ADLARI:
-   - Belirli bir tarih bildiren gün ve ay adları BÜYÜK harfle başlar, gelen çekim eki kesmeyle ayrılır: "3 Haziran'da", "27 Aralık 2004". ("3 haziranda" YANLIŞTIR).
-
-4. ÖZEL ADA DAHİL OLMAYAN TÜR VE YER ADLARI:
-   - Özel ada dahil olmayan tür adları KÜÇÜK harfle başlar: "Van kedisi", "Amasya elması", "Antep fıstığı", "Maraş dondurması". ("Van Kedisi" YANLIŞTIR).
-   - Özel ada dahil olmayan il, ilçe, köy, belde adları KÜÇÜK harfle başlar: "Çukurca köyü", "Uzungöl beldesi". ("Çukurca Köyü" YANLIŞTIR).
-
-5. KISALTMALARA GELEN EKLER:
-   - Büyük harfle yapılan kısaltmalara getirilen eklerde kısaltmanın son harfinin okunuşu esas alınır: "THY'nin" (Te-He-Ye'nin), "TRT'de", "MEB'in". ("THY'nın" YANLIŞTIR).
-
-6. SES DÜŞMESİ OLAN BİRLEŞİK FİİLLER:
-   - "Etmek, olmak" yardımcı fiilleriyle kurulan ve ilk kelimesinde ünlü düşmesi veya ünsüz türemesi olan birleşikler BİTİŞİK yazılır: "devretti" (devir etti YANLIŞTIR), "hükmetti", "sabretti", "şükretti", "affetti", "hissetti".
-
-7. SOMUT YER BİLDİRMEYEN "ALT, ÜST, ÜZERİ" SÖZCÜKLERİ:
-   - Somut bir yer bildirmeyen alt, üst ve üzeri sözleriyle kurulan birleşik kelimeler BİTİŞİK yazılır: "ayaküstü", "akşamüstü", "öğleüstü", "suçüstü", "insanüstü", "olağanüstü", "bilinçaltı". ("ayak üstü" YANLIŞTIR -> "ayaküstü").
-
-8. "-SEVER" EKİYLE KURULAN BİRLEŞİK KELİMELER:
-   - HER ZAMAN BİTİŞİK YAZILIR: "doğasever", "vatansever", "kitapsever", "hayvansever", "sanatsever", "müziksever".
-
-9. BİTİŞİK YAZILAN BÖCEK VE BİTKİ/YİYECEK ADLARI:
-   - "ateşböceği", "uğurböceği", "ağustosböceği" BİTİŞİK yazılır.
-   - "sivribiber", "karabiber", "zeytinyağı", "başpıtrak" BİTİŞİK yazılır.
-   - "yeşil zeytin", "kuru fasulye", "yeşil biber" AYRI yazılır.
-
-10. "ALTÜST" SÖZCÜĞÜ:
-    - "altüst etmek", "altüst olmak" BİTİŞİK yazılır.
-
-11. BAĞLAÇ OLAN "DA / DE":
-    - Cümleden çıkarıldığında anlam bozulmayan bağlaç "da / de" her zaman AYRI yazılır: "dosyanı da yanında götür", "ben de geleceğim". ("dosyanıda" YANLIŞTIR).
-
-12. ÖZEL VE KALIPLAŞMIŞ SÖZCÜKLER:
-    - "pek çok" (AYRI), "hiç kimse" (AYRI), "bir gün" (AYRI), "birkaç" (BİTİŞİK), "hiçbir" (BİTİŞİK), "bugün" (BİTİŞİK).
-
-STANDART TYT KURAL KATEGORİLERİ (rule_category alanı sadece bu standart başlıklardan biri olmalıdır):
-- "Büyük Harflerin Yazımı" (Ülke, devlet, kişi, kurum, gezegen, özel adlar ve unvanlar için)
-- "Bitişik Yazılan Birleşik Kelimeler" (-sever, altüst, ateşböceği, sivribiber vb.)
-- "Ayrı Yazılan Kelimeler" (şehirler arası, yeşil biber, ikilemeler, pek çok vb.)
-- "Bağlaç Olan Da / De'nin Yazımı"
-- "Bağlaç Olan Ki'nin Yazımı"
-- "Kısaltmaların Yazımı" (THY'nin, MEB'in vb.)
-- "Tarih ve Sayıların Yazımı" (3 Haziran'da vb.)
-- "Ses Olayları ve Yardımcı Fiiller" (devretti, şükretti vb.)
-- "Düzeltme İşareti (Şapka ^)" (tezgâh, dükkân vb.)
-- "Yazımı Karıştırılan Sözcükler"
-
-ÖNEMLİ KURAL:
-- "correct_word" asla başka bir kelimeyle (örneğin simit vb.) değiştirilemez! Yalnızca o kelimenin imla kuralına uygun doğru yazılışı olmalıdır.
-- "wrong_word" ve "correct_word" ASLA birebir aynı olamaz!
+STANDART 10 TYT KURAL KATEGORİSİ (rule_category alanı YALNIZCA bu 10 başlıktan biri olmalıdır):
+1. "Büyük Harflerin Yazımı"
+2. "Bitişik Yazılan Birleşik Kelimeler"
+3. "Ayrı Yazılan Kelimeler"
+4. "Bağlaç Olan Da / De'nin Yazımı"
+5. "Bağlaç Olan Ki'nin Yazımı"
+6. "Soru Eki Mı / Mi'nin Yazımı"
+7. "Kısaltmaların Yazımı"
+8. "Tarih ve Sayıların Yazımı"
+9. "Ses Olayları ve Yardımcı Fiiller"
+10. "Düzeltme İşareti (Şapka ^)"
 
 JSON FORMATI:
 {
@@ -79,15 +128,14 @@ JSON FORMATI:
     "D": "D seçeneği",
     "E": "E seçeneği"
   },
-  "wrong_option": "C",
-  "wrong_word": "güney Afrika Cumhuriyeti",
-  "correct_word": "Güney Afrika Cumhuriyeti",
-  "rule_category": "Büyük Harflerin Yazımı",
-  "explanation": "TDK kurallarına göre devlet ve ülke adlarını oluşturan tüm sözcükler büyük harfle başlar.",
-  "coach_note": "Ülke ve devlet adlarının yazımı TYT'de sıkça sorulur.",
+  "wrong_option": "A",
+  "wrong_word": "ayırtetmemizi",
+  "correct_word": "ayırt etmemizi",
+  "rule_category": "Ayrı Yazılan Kelimeler",
+  "explanation": "TDK kuralına göre ses düşmesi veya türemesi olmayan birleşik fiiller ayrı yazılır.",
+  "coach_note": "'ayırt etmek', 'fark etmek', 'terk etmek' gibi birleşik fiillerde ses olayı olmadığı için daima ayrı yazılır!",
   "difficulty_score": 6
-}
-`;
+}`;
 
 export const groqService = {
   async analyzeTextWithLlama(
@@ -96,40 +144,40 @@ export const groqService = {
   ): Promise<AnalysisResult> {
     const trimmed = rawText.trim();
 
-    // 1. Tier 1: Groq LLaMA-3.3-70B
+    // 1. Tier 1: Groq LLaMA-3.3-70B (Fast, accurate, high rate-limit, zero Gemini quota consumption)
     try {
       if (GROQ_API_KEY) {
         const groqRes = await this.callGroqAPI(trimmed);
-        if (groqRes && groqRes.wrong_option) {
+        if (groqRes && groqRes.wrong_option && groqRes.wrong_word) {
           return this.finalizeAnalysis(groqRes, trimmed, existingUserErrors);
         }
       }
     } catch (err) {
-      console.warn('Groq primary attempt failed, trying OpenRouter...', err);
+      console.warn('Groq primary attempt failed, trying OpenRouter fallback...', err);
     }
 
     // 2. Tier 2: OpenRouter LLaMA-3.3-70B
     try {
       if (OPENROUTER_API_KEY) {
         const openRouterRes = await this.callOpenRouterAPI(trimmed);
-        if (openRouterRes && openRouterRes.wrong_option) {
+        if (openRouterRes && openRouterRes.wrong_option && openRouterRes.wrong_word) {
           return this.finalizeAnalysis(openRouterRes, trimmed, existingUserErrors);
         }
       }
     } catch (err) {
-      console.warn('OpenRouter attempt failed, trying Gemini 2.5 Flash...', err);
+      console.warn('OpenRouter attempt failed, trying Gemini fallback...', err);
     }
 
-    // 3. Tier 3: Gemini 2.5 Flash
+    // 3. Tier 3: Gemini 2.5 Flash (Fallback only if Groq/OpenRouter are unavailable)
     try {
       if (GEMINI_API_KEY) {
         const geminiRes = await this.callGeminiAPI(trimmed);
-        if (geminiRes && geminiRes.wrong_option) {
+        if (geminiRes && geminiRes.wrong_option && geminiRes.wrong_word) {
           return this.finalizeAnalysis(geminiRes, trimmed, existingUserErrors);
         }
       }
     } catch (err) {
-      console.warn('Gemini 2.5 Flash attempt failed, using local inspection...', err);
+      console.warn('Gemini fallback attempt failed, using local inspection...', err);
     }
 
     // 4. Local Rule Engine Fallback
@@ -139,6 +187,7 @@ export const groqService = {
   async callGroqAPI(text: string): Promise<AnalysisResult> {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
+      signal: AbortSignal.timeout(30000),
       headers: {
         'Authorization': `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json'
@@ -160,12 +209,14 @@ export const groqService = {
 
     const data = await response.json();
     const rawContent = data.choices?.[0]?.message?.content || '{}';
-    return JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+    const parsed = JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+    return this.sanitizeResult(parsed, text);
   },
 
   async callOpenRouterAPI(text: string): Promise<AnalysisResult> {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
+      signal: AbortSignal.timeout(30000),
       headers: {
         'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
         'HTTP-Referer': 'http://localhost:3000',
@@ -189,7 +240,8 @@ export const groqService = {
 
     const data = await response.json();
     const rawContent = data.choices?.[0]?.message?.content || '{}';
-    return JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+    const parsed = JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+    return this.sanitizeResult(parsed, text);
   },
 
   async callGeminiAPI(text: string): Promise<AnalysisResult> {
@@ -202,7 +254,46 @@ export const groqService = {
     const prompt = `${MASTER_SYSTEM_PROMPT}\n\nAnaliz Edilecek Soru Metni:\n${text}`;
     const res = await model.generateContent(prompt);
     const raw = res.response.text();
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return this.sanitizeResult(parsed, text);
+  },
+
+  sanitizeResult(raw: any, fallbackText: string): AnalysisResult {
+    const rawOptions = raw?.options;
+    const options: Record<string, string> = {};
+
+    if (rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)) {
+      ['A', 'B', 'C', 'D', 'E'].forEach((k) => {
+        if (rawOptions[k] && typeof rawOptions[k] === 'string') {
+          options[k] = rawOptions[k].trim();
+        }
+      });
+    }
+
+    // Fallback options if missing or corrupt
+    if (Object.keys(options).length === 0) {
+      const lines = fallbackText.split('\n').map((l) => l.trim()).filter(Boolean);
+      lines.forEach((line) => {
+        const m = line.match(/^([A-Ea-e])[\)\.\-]\s*(.*)$/);
+        if (m) {
+          options[m[1].toUpperCase()] = m[2].trim();
+        }
+      });
+    }
+
+    return {
+      question_text: typeof raw?.question_text === 'string' && raw.question_text.trim()
+        ? raw.question_text.trim()
+        : fallbackText.slice(0, 300),
+      options,
+      wrong_option: typeof raw?.wrong_option === 'string' ? raw.wrong_option.toUpperCase().trim() : undefined,
+      wrong_word: typeof raw?.wrong_word === 'string' ? raw.wrong_word.trim() : '',
+      correct_word: typeof raw?.correct_word === 'string' ? raw.correct_word.trim() : '',
+      rule_category: typeof raw?.rule_category === 'string' ? normalizeCategory(raw.rule_category) : 'Ayrı Yazılan Kelimeler',
+      explanation: typeof raw?.explanation === 'string' ? raw.explanation.trim() : 'Yazım kuralı kontrolü yapıldı.',
+      coach_note: typeof raw?.coach_note === 'string' ? raw.coach_note.trim() : undefined,
+      difficulty_score: typeof raw?.difficulty_score === 'number' ? Math.min(10, Math.max(1, raw.difficulty_score)) : 5
+    };
   },
 
   async finalizeAnalysis(
@@ -217,7 +308,25 @@ export const groqService = {
       parsed.correct_word = parsed.correct_word.replace(/^[\.,:;"'“”‘’\(\)]+|[\.,:;"'“”‘’\(\)]+$/g, '').trim();
     }
 
-    // Auto-fix if identical or missing
+    // 1. Check for hallucination / extreme word mismatch (e.g. "başpıtrak" -> "simit")
+    if (parsed.wrong_word && parsed.correct_word) {
+      const dist = levenshteinDistance(parsed.wrong_word, parsed.correct_word);
+      const maxLen = Math.max(parsed.wrong_word.length, parsed.correct_word.length);
+      // If words differ completely and length > 4 with high edit distance
+      if (maxLen > 4 && dist > maxLen * 0.6 && !parsed.wrong_word.includes(' ') && !parsed.correct_word.includes(' ')) {
+        console.warn('Possible hallucination detected:', parsed.wrong_word, '->', parsed.correct_word);
+        const fixed = this.inspectOptionsLocally(parsed.options || {}, rawText);
+        if (fixed) {
+          parsed.wrong_option = fixed.wrong_option;
+          parsed.wrong_word = fixed.wrong_word;
+          parsed.correct_word = fixed.correct_word;
+          parsed.rule_category = fixed.rule_category;
+          parsed.explanation = fixed.explanation;
+        }
+      }
+    }
+
+    // 2. Prevent identical wrong_word and correct_word
     if (
       !parsed.wrong_word ||
       !parsed.correct_word ||
@@ -233,18 +342,28 @@ export const groqService = {
       }
     }
 
-    // Cross-verify with TDK service
-    const tdkCheck = await tdkService.verifyWithTdk(parsed.wrong_word || parsed.correct_word);
-    if (tdkCheck.isValid && tdkCheck.correctForm) {
-      parsed.correct_word = tdkCheck.correctForm;
+    // 3. Strictly Normalize Category to Canonical 10 TYT Categories
+    parsed.rule_category = normalizeCategory(parsed.rule_category);
+
+    // 4. Verify the CORRECT word against TDK Sözlük (forward verification)
+    if (parsed.correct_word) {
+      try {
+        const tdkCheck = await tdkService.verifyWithTdk(parsed.correct_word);
+        if (tdkCheck.isValid && tdkCheck.correctForm) {
+          parsed.correct_word = tdkCheck.correctForm;
+        }
+      } catch (err) {
+        console.warn('TDK verification check skipped:', err);
+      }
     }
 
+    // 5. Compute coach note from historical weak spots
     const sameRuleCount = existingUserErrors.filter(
       e => (e.rule_category || '').toLocaleLowerCase('tr-TR') === (parsed.rule_category || '').toLocaleLowerCase('tr-TR')
     ).length;
 
     if (sameRuleCount >= 2) {
-      parsed.coach_note = `Bu kuralı bu ay ${sameRuleCount + 1}. kez karıştırdın, dikkat etmende fayda var. Kısa bir tekrar sınavda net kazandırır!`;
+      parsed.coach_note = `Bu kuralı (${parsed.rule_category}) bu ay ${sameRuleCount + 1}. kez karıştırdın. Kısa bir tekrar sınavda net kazandırır!`;
     }
 
     return parsed;
@@ -259,14 +378,22 @@ export const groqService = {
       { wrong: 'kagit', correct: 'kâğıt', category: 'Düzeltme İşareti (Şapka ^)', exp: "TDK'ye göre 'kâğıt' sözcüğü düzeltme işaretiyle (şapka) yazılır." },
 
       // 2. İkilemeler
-      { wrong: 'başabaş', correct: 'başa baş', category: 'İkilemelerin Yazımı', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'başa baş' olmalıdır." },
-      { wrong: 'içlidışlı', correct: 'içli dışlı', category: 'İkilemelerin Yazımı', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'içli dışlı' olmalıdır." },
-      { wrong: 'artarda', correct: 'art arda', category: 'İkilemelerin Yazımı', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'art arda' olmalıdır." },
+      { wrong: 'başabaş', correct: 'başa baş', category: 'Ayrı Yazılan Kelimeler', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'başa baş' olmalıdır." },
+      { wrong: 'içlidışlı', correct: 'içli dışlı', category: 'Ayrı Yazılan Kelimeler', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'içli dışlı' olmalıdır." },
+      { wrong: 'artarda', correct: 'art arda', category: 'Ayrı Yazılan Kelimeler', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'art arda' olmalıdır." },
+      { wrong: 'yanyana', correct: 'yan yana', category: 'Ayrı Yazılan Kelimeler', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'yan yana' olmalıdır." },
+      { wrong: 'enineboyuna', correct: 'enine boyuna', category: 'Ayrı Yazılan Kelimeler', exp: "İkilemeler her zaman ayrı yazılır. Doğrusu 'enine boyuna' olmalıdır." },
 
       // 3. Kalıplaşmış Birleşik Kelimeler
-      { wrong: 'zeytin yağlı', correct: 'zeytinyağlı', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'zeytinyağı' ve 'zeytinyağlı' kalıplaşmış olarak bitişik yazılır." },
-      { wrong: 'zeytin yağı', correct: 'zeytinyağı', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'zeytinyağı' bitişik yazılır." },
-      { wrong: 'dere otu', correct: 'dereotu', category: 'Bitişik Yazılan Kelimeler', exp: "TDK'ye göre 'dereotu' bitişik yazılır." },
+      { wrong: 'zeytin yağlı', correct: 'zeytinyağlı', category: 'Bitişik Yazılan Birleşik Kelimeler', exp: "TDK'ye göre 'zeytinyağı' ve 'zeytinyağlı' kalıplaşmış olarak bitişik yazılır." },
+      { wrong: 'zeytin yağı', correct: 'zeytinyağı', category: 'Bitişik Yazılan Birleşik Kelimeler', exp: "TDK'ye göre 'zeytinyağı' bitişik yazılır." },
+      { wrong: 'dere otu', correct: 'dereotu', category: 'Bitişik Yazılan Birleşik Kelimeler', exp: "TDK'ye göre 'dereotu' bitişik yazılır." },
+      { wrong: 'baş pıtrak', correct: 'başpıtrak', category: 'Bitişik Yazılan Birleşik Kelimeler', exp: "TDK'ye göre 'başpıtrak' bitişik yazılır." },
+      { wrong: 'doğa sever', correct: 'doğasever', category: 'Bitişik Yazılan Birleşik Kelimeler', exp: "TDK'ye göre -sever ile kurulanlar bitişik yazılır." },
+      { wrong: 'alt üst', correct: 'altüst', category: 'Bitişik Yazılan Birleşik Kelimeler', exp: "TDK'ye göre 'altüst etmek' bitişik yazılır." },
+      { wrong: 'akşam üzeri', correct: 'akşamüzeri', category: 'Bitişik Yazılan Birleşik Kelimeler', exp: "TDK'ye göre somut yer bildirmeyen üzeri sözleri bitişik yazılır." },
+      { wrong: 'ayak üstü', correct: 'ayaküstü', category: 'Bitişik Yazılan Birleşik Kelimeler', exp: "TDK'ye göre 'ayaküstü' bitişik yazılır." },
+      { wrong: 'bilinç altı', correct: 'bilinçaltı', category: 'Bitişik Yazılan Birleşik Kelimeler', exp: "TDK'ye göre 'bilinçaltı' bitişik yazılır." },
 
       // 4. Yardımcı Fiiller
       { wrong: 'arzetti', correct: 'arz etti', category: 'Ayrı Yazılan Kelimeler', exp: "Ses olayı (düşme/türeme) olmayan birleşik fiiller ayrı yazılır." },
@@ -275,9 +402,10 @@ export const groqService = {
       { wrong: 'ayırtetmemizi', correct: 'ayırt etmemizi', category: 'Ayrı Yazılan Kelimeler', exp: "Ses olayı olmayan birleşik fiiller ayrı yazılır." },
       { wrong: 'haketti', correct: 'hak etti', category: 'Ayrı Yazılan Kelimeler', exp: "Ses olayı olmayan birleşik fiiller ayrı yazılır." },
 
-      // 5. Kesme İşareti (Kurum/Üniversite)
-      { wrong: "Üniversitesi'nin", correct: "Üniversitesinin", category: "Kesme İşaretinin Kullanımı", exp: "Kurum ve üniversite adlarına gelen ekler kesme işaretiyle ayrılmaz." },
-      { wrong: "Kurumu'nun", correct: "Kurumunun", category: "Kesme İşaretinin Kullanımı", exp: "Kurum ve kuruluş adlarına gelen ekler kesme işaretiyle ayrılmaz." }
+      // 5. Büyük Harfler ve Kesme İşareti
+      { wrong: "Üniversitesi'nin", correct: "Üniversitesinin", category: 'Büyük Harflerin Yazımı', exp: "Kurum ve üniversite adlarına gelen ekler kesme işaretiyle ayrılmaz." },
+      { wrong: "Kurumu'nun", correct: "Kurumunun", category: 'Büyük Harflerin Yazımı', exp: "Kurum ve kuruluş adlarına gelen ekler kesme işaretiyle ayrılmaz." },
+      { wrong: "Van Kedisi", correct: "Van kedisi", category: 'Büyük Harflerin Yazımı', exp: "Özel ada dahil olmayan tür isimleri küçük harfle başlar." }
     ];
 
     for (const [key, optText] of Object.entries(options)) {
@@ -290,7 +418,7 @@ export const groqService = {
             wrong_option: key,
             wrong_word: rule.wrong,
             correct_word: rule.correct,
-            rule_category: rule.category,
+            rule_category: normalizeCategory(rule.category),
             explanation: rule.exp
           };
         }
@@ -329,28 +457,142 @@ export const groqService = {
         wrong_option: inspected.wrong_option,
         wrong_word: inspected.wrong_word,
         correct_word: inspected.correct_word,
-        rule_category: inspected.rule_category,
+        rule_category: normalizeCategory(inspected.rule_category),
         explanation: inspected.explanation,
         coach_note: "TYT Türkçe sınavında TDK yazım kuralları her yıl mutlaka test edilir.",
         difficulty_score: 5
       };
     }
 
+    // Honest fallback without generating equal/fake wrong_word == correct_word
     const firstKey = Object.keys(options)[0] || 'A';
-    const firstText = options[firstKey] || text;
-    const words = firstText.split(/\s+/).filter(w => w.length > 3);
-    const dynamicWord = words[0] || "bu sözcük";
-
     return {
       question_text: questionText,
       options: Object.keys(options).length > 0 ? options : { A: text },
       wrong_option: firstKey,
-      wrong_word: dynamicWord,
-      correct_word: dynamicWord,
-      rule_category: "Yazım Kuralları",
-      explanation: "TDK Yazım Kılavuzu kurallarına dikkat edilmelidir.",
-      coach_note: "Sözcüklerin TDK kurallarına uygun yazılışını düzenli tekrar edin.",
+      wrong_word: 'Tespit Edilemedi',
+      correct_word: 'Lütfen Elle Düzenleyin',
+      rule_category: 'Ayrı Yazılan Kelimeler',
+      explanation: 'Soru otomatik kurallarla tam çözümlenemedi. Lütfen soruyu detay ekranından inceleyip hatalı kelimeyi elle düzenleyin.',
+      coach_note: '💡 Otomatik analiz yapılamadı; kaydı onayladıktan sonra düzenle butonunu kullanarak kuralı belirtebilirsin.',
       difficulty_score: 5
     };
+  },
+
+  /**
+   * Generates authentic, dynamic, 100% unique 5-option TYT questions using Groq / OpenRouter LLaMA 3.3 70B
+   */
+  async generateAIQuestionsBatch(
+    targets: { wrong_word: string; correct_word: string; category: string }[],
+    difficulty: 'kolay' | 'orta' | 'zor',
+    inspirationSnippets: string[] = []
+  ): Promise<any[]> {
+    if (!targets || targets.length === 0) return [];
+
+    const promptItems = targets.map((t, idx) => 
+      `Soru ${idx + 1}: Yanlış yazılan kelime: "${t.wrong_word}", Doğru yazılışı: "${t.correct_word}", Kural kategorisi: "${t.category}"`
+    ).join('\n');
+
+    const inspirationBlock = inspirationSnippets.length > 0
+      ? `\nÖĞRENCİNİN KENDİ SORU HAVUZUNDAN ESİNLENME VE BAĞLAM REFERANSLARI:
+${inspirationSnippets.slice(0, 6).map((s, i) => `${i + 1}. "${s}"`).join('\n')}
+TALİMAT: Yukarıdaki referans cümlelerin edebi üslubundan, kelime zenginliğinden ve temalarından esinlenerek yepyeni, özgün cümleler kur.\n`
+      : '';
+
+    const systemPrompt = `Sen Türkiye'nin en iyi TYT Türkçe Soru Yazarı ve TDK Kural Uzmanısın.
+
+GÖREVİN:
+Verilen hedefler için ÖSYM / MEB standartlarında, 5 seçenekli (A, B, C, D, E) ÖZGÜN, YEPYENİ ve EDEBİ Türkçe yazım kuralları soruları üretmektir.
+${inspirationBlock}
+KRİTİK KURALLAR:
+1. TEK HATA KURALI: Her soruda KESİNLİKLE sadece ve sadece 1 adet yazım yanlışı bulunmalıdır. O yanlış da belirtilen hedef kelimedir.
+2. DİĞER 4 ŞIK: Diğer 4 seçenek kesinlikle ve şüphesizce %100 YAZIM YANLIŞSIZ, kusursuz, doğal, edebi/akademik Türkçe cümleler olmalıdır. Cümleler birbirini tekrar etmemeli, her seferinde yaratıcı ve özgün olmalıdır.
+3. RASTGELE ŞIK: Hatalı şıkkın harfi (A, B, C, D veya E) her soruda rastgele dağıtılmalıdır.
+4. ZORLUK SEVİYESİ: ${difficulty.toUpperCase()} (kolay: günlük sade dil; orta: TYT deneme standartı; zor: ÖSYM çeldiricili edebi/akademik metin).
+5. CÜMLE BAŞI BÜYÜK HARF KURALI (HAYATİ ÖNEMDE):
+   - Türkçede her cümle kural gereği BÜYÜK HARFLE başlar.
+   - Eğer hedef kelimenin yanlışı "küçük harfle yazılması gereken bir unvan, meslek, akrabalık adı veya yön adının büyük yazılması" ise (örn: "Kaymakam" -> "kaymakam", "Doktor" -> "doktor", "Teyze" -> "teyze", "Batı" -> "batı"):
+     BU KELİMEYİ KESİNLİKLE CÜMLE BAŞINA KOYMA! Çünkü cümle başındaki her kelime zaten büyük harfle başlar ve bu bir hata sayılmaz.
+     Bu tür kelimeleri MUTLAKA cümlenin ortasına veya sonuna yerleştir (Örn: "Dün kasabaya gelen Kaymakam beyi herkes karşıladı." ➔ 'Kaymakam' ortada olduğu için yazım yanlışıdır).
+6. DERİNLEMESİNE VE ÖZGÜN KOÇ NOTU (coach_note):
+   - Asla "Bu kurala dikkat edin", "Büyük harfleri iyi öğrenin" gibi genel-geçer ve jenerik cümleler YAZMA!
+   - Her soru için doğrudan o kelimeye ve kurala özel bir ÖĞRETMEN TAKTİĞİ, ÖSYM TUZAĞI ÇÖZÜMÜ ve HAFIZA KODLAMASI (Mnemonic) yaz.
+   - Örneğin 'terketti' için: "'Etmek' yardımcı fiilinde ses düşmesi veya türemesi yoksa ayrı yazılır. Ayrı okuyabildiğin her birleşik fiili ayrı yazmayı unutma!"
+   - Örneğin 'akşam üzeri' için: "Somut fiziksel yer bildirmeyen 'alt, üst, üzeri' sözcükleri (akşamüzeri, ayaküstü, suçüstü) mecazlaşıp kalıplaştığı için bitişik yazılır!"
+
+ÇIKTI FORMATI:
+Sadece şu JSON nesnesini döndür:
+{
+  "questions": [
+    {
+      "question_text": "Aşağıdaki cümlelerin hangisinde bir yazım yanlışı vardır?",
+      "options": {
+        "A": "Cümle metni...",
+        "B": "Cümle metni...",
+        "C": "Cümle metni...",
+        "D": "Cümle metni...",
+        "E": "Cümle metni..."
+      },
+      "wrong_option": "C",
+      "wrong_word": "...",
+      "correct_word": "...",
+      "rule_category": "...",
+      "explanation": "TDK kural gerekçesi",
+      "coach_note": "O kelimeye ve kurala özel taktiksel, derinlemesine öğretmen koç notu"
+    }
+  ]
+}`;
+
+    const makeCall = async (endpoint: string, key: string, model: string, extraHeaders = {}) => {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        signal: AbortSignal.timeout(20000),
+        headers: {
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          ...extraHeaders
+        },
+        body: JSON.stringify({
+          model,
+          response_format: { type: 'json_object' },
+          temperature: 0.7, // Creative generation for unique non-repetitive sentences
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Lütfen şu ${targets.length} adet soru için TYT sınav sorularını üret:\n${promptItems}` }
+          ]
+        })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const rawContent = data.choices?.[0]?.message?.content || '{}';
+      return JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+    };
+
+    try {
+      if (GROQ_API_KEY) {
+        const res = await makeCall('https://api.groq.com/openai/v1/chat/completions', GROQ_API_KEY, 'llama-3.3-70b-versatile');
+        if (res && Array.isArray(res.questions) && res.questions.length > 0) {
+          return res.questions;
+        }
+      }
+    } catch (err) {
+      console.warn('Groq quiz generation failed, trying OpenRouter:', err);
+    }
+
+    try {
+      if (OPENROUTER_API_KEY) {
+        const res = await makeCall('https://openrouter.ai/api/v1/chat/completions', OPENROUTER_API_KEY, 'meta-llama/llama-3.3-70b-instruct', {
+          'HTTP-Referer': 'http://localhost:3000',
+          'X-Title': 'TDK TYT Master'
+        });
+        if (res && Array.isArray(res.questions) && res.questions.length > 0) {
+          return res.questions;
+        }
+      }
+    } catch (err) {
+      console.warn('OpenRouter quiz generation failed:', err);
+    }
+
+    return [];
   }
 };
