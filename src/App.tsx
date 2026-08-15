@@ -64,7 +64,7 @@ export function App() {
   useEffect(() => {
     if (currentUser) {
       setIsLoadingErrors(true);
-      errorService.getUserErrors(currentUser.id).then((data) => {
+      errorService.getUserErrors(currentUser.id).then((data: UserError[]) => {
         setErrors(data);
         setIsLoadingErrors(false);
       });
@@ -126,7 +126,7 @@ export function App() {
 
   // If no user is logged in, show direct Onboarding & Login screen
   if (!currentUser) {
-    return <OnboardingView onSuccess={(user) => setCurrentUser(user)} />;
+    return <OnboardingView onSuccess={(user: any) => setCurrentUser(user)} />;
   }
 
   return (

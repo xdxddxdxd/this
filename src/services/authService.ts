@@ -1,13 +1,22 @@
 export const authService = {
   getCurrentUser() {
+    const savedName = localStorage.getItem('tdk_user_name') || 'Thisdoukan';
     return {
       id: 'local-user',
-      email: 'ogrenci@yks-hedef.com',
+      username: savedName.toLowerCase().replace(/\s+/g, ''),
+      email: `${savedName.toLowerCase().replace(/\s+/g, '')}@yks-hedef.com`,
+      full_name: savedName,
+      avatar_url: '',
+      created_at: new Date().toISOString(),
       user_metadata: {
-        full_name: 'YKS Adayı',
+        full_name: savedName,
         avatar_url: ''
       }
     };
+  },
+
+  async logout() {
+    return { success: true };
   },
 
   async login(usernameOrEmail: string, _password?: string): Promise<{ success: boolean; user: any; error: string | null }> {

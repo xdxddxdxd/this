@@ -109,6 +109,31 @@ export const errorService = {
     }
   },
 
+  async getUserErrors(userId: string): Promise<UserError[]> {
+    return this.getErrors(userId);
+  },
+
+  async addError(errorItem: Omit<UserError, 'id' | 'created_at'>): Promise<UserError> {
+    return this.saveError(errorItem);
+  },
+
+  getTopMistakenRule(errors: UserError[]): string {
+    if (!errors || errors.length === 0) return 'Büyük Harflerin Yazımı';
+    const counts: Record<string, number> = {};
+    errors.forEach(e => {
+      counts[e.rule_category] = (counts[e.rule_category] || 0) + 1;
+    });
+    let topRule = 'Büyük Harflerin Yazımı';
+    let maxCount = 0;
+    Object.entries(counts).forEach(([rule, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        topRule = rule;
+      }
+    });
+    return topRule;
+  },
+
   getLocalErrors(): UserError[] {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
