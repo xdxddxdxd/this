@@ -45,7 +45,6 @@ export const FlashcardQuizModal: React.FC<FlashcardQuizModalProps> = ({
     if (isRevealed) return;
     setSelectedOption(optKey);
     setIsRevealed(true);
-
     const isCorrect = optKey.toUpperCase() === correctOption;
     if (isCorrect) {
       setScore((prev) => prev + 1);
@@ -263,9 +262,13 @@ export const FlashcardQuizModal: React.FC<FlashcardQuizModalProps> = ({
                 </div>
 
                 {currentQ.coach_note && (
-                  <div className="coach-note-card" style={{ padding: '10px 14px' }}>
-                    <div style={{ fontFamily: 'var(--font-handwriting)', fontSize: '1.15rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>
-                      {currentQ.coach_note}
+                  <div className="coach-note-card" style={{ padding: '12px 14px' }}>
+                    <div className="coach-note-header" style={{ fontSize: '0.75rem' }}>KOÇ NOTU</div>
+                    <div className="coach-note-content">
+                      <span className="coach-handwriting-icon" aria-hidden="true">!</span>
+                      <div className="coach-note-text" style={{ fontSize: '1.18rem' }}>
+                        {currentQ.coach_note}
+                      </div>
                     </div>
                   </div>
                 )}
