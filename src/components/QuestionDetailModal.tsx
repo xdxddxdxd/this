@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Edit3, Trash2, Star, Check, X } from 'lucide-react';
+import { ArrowLeft, Edit3, Trash2, Star, Check, X, AlertCircle, Sparkles } from 'lucide-react';
 import { UserError } from '../types';
+import { HighlightedQuestionText } from './HighlightedText';
+import { enrichOptionsWithPhrases } from '../services/questionSplitter';
 
 interface QuestionDetailModalProps {
   errorItem: UserError;
@@ -20,46 +22,52 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
   const [editedCorrectWord, setEditedCorrectWord] = useState(errorItem.correct_word);
   const [editedExplanation, setEditedExplanation] = useState(errorItem.explanation);
   const [editedCoachNote, setEditedCoachNote] = useState(errorItem.coach_note || '');
+  const [editError, setEditError] = useState<string | null>(null);
 
-  const formatDate = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch {
-      return dateStr;
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editedWrongWord.trim() || !editedCorrectWord.trim()) {
+      setEditError('Hatalı kelime ve doğru kelime alanları boş bırakılamaz.');
+      return;
     }
-  };
 
-  const handleSaveEdit = () => {
     onUpdate(errorItem.id, {
-      wrong_word: editedWrongWord,
-      correct_word: editedCorrectWord,
-      explanation: editedExplanation,
-      coach_note: editedCoachNote
+      wrong_word: editedWrongWord.trim(),
+      correct_word: editedCorrectWord.trim(),
+      explanation: editedExplanation.trim(),
+      coach_note: editedCoachNote.trim() || undefined
     });
     setIsEditing(false);
   };
 
-  // Helper to render option text with red pen correction
-  const renderOptionContent = (optKey: string, optText: string) => {
-    const isWrong = errorItem.wrong_option?.toUpperCase() === optKey.toUpperCase();
-    
-    if (!isWrong) {
-      return <span>{optText}</span>;
+  const formatDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleDateString('tr-TR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    } catch {
+      return '';
     }
+  };
+
+  const renderOptionContent = (key: string, optText: string) => {
+    const isWrong = errorItem.wrong_option?.toUpperCase() === key.toUpperCase();
+    if (!isWrong) return <span>{optText}</span>;
 
     const wrongWord = errorItem.wrong_word;
     const correctWord = errorItem.correct_word;
 
-    // Check if wrong word is in this option text (Turkish locale aware)
     const idx = optText.toLocaleLowerCase('tr-TR').indexOf(wrongWord.toLocaleLowerCase('tr-TR'));
     if (idx === -1) {
       return (
-        <span className="wrong-choice-container">
-          <span className="option-annotation-above">
-            {correctWord} <span className="correction-caret">^</span>
+        <span>
+          <del className="struck-word">{wrongWord || optText}</del>
+          <span className="correction-badge-inline">
+            <span className="caret-arrow">^</span>
+            <span>{correctWord}</span>
           </span>
-          <span className="struck-word">{optText}</span>
         </span>
       );
     }
@@ -69,7 +77,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
     const after = optText.substring(idx + wrongWord.length);
 
     return (
-      <span style={{ lineHeight: 1.8 }}>
+      <span>
         {before}
         <del className="struck-word">{matched}</del>
         <span className="correction-badge-inline">
@@ -81,70 +89,112 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
     );
   };
 
-  const optionKeys = ['A', 'B', 'C', 'D', 'E'] as const;
-  const hasOptions = Object.keys(errorItem.options || {}).length > 0;
+  const enrichedOptions = enrichOptionsWithPhrases(errorItem.question_text || '', errorItem.options || {});
+  const optionEntries = Object.entries(enrichedOptions).filter(([_, text]) => Boolean(text));
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        {/* Top Header */}
-        <div className="detail-header">
-          <button className="back-btn" onClick={onClose} aria-label="Geri Dön">
-            <ArrowLeft size={22} />
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div
+        className="modal-content modal-content-large"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxHeight: '90vh', overflowY: 'auto' }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
+          <button
+            onClick={onClose}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+          >
+            <ArrowLeft size={18} /> Geri
           </button>
-          <span className="detail-date">{formatDate(errorItem.created_at)}</span>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={() => onUpdate(errorItem.id, { is_favorite: !errorItem.is_favorite })}
+              style={{ background: 'none', border: 'none', color: errorItem.is_favorite ? 'var(--color-red)' : 'var(--text-muted)', cursor: 'pointer' }}
+              title="Yıldızla"
+            >
+              <Star size={18} fill={errorItem.is_favorite ? 'var(--color-red)' : 'none'} />
+            </button>
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+              title="Düzenle"
+            >
+              <Edit3 size={18} />
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Bu soruyu silmek istediğine emin misin?')) {
+                  onDelete(errorItem.id);
+                  onClose();
+                }
+              }}
+              style={{ background: 'none', border: 'none', color: 'var(--color-red)', cursor: 'pointer' }}
+              title="Sil"
+            >
+              <Trash2 size={18} />
+            </button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
-        <div className="detail-body">
-          {/* Exam Paper Card */}
-          <div className="exam-paper-card">
-            <div className="card-watermark-quote">“</div>
-            <div className="question-stem">{errorItem.question_text}</div>
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          
+          {/* Question Text Box */}
+          <div className="paper-question-container">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+              <span className="rule-badge">{errorItem.rule_category}</span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{formatDate(errorItem.created_at)}</span>
+            </div>
 
-            {hasOptions ? (
-              <div className="options-list" style={{ marginTop: '16px' }}>
-                {optionKeys.map((key) => {
-                  const text = errorItem.options[key];
-                  if (!text) return null;
-                  const isWrong = errorItem.wrong_option?.toUpperCase() === key;
+            <div style={{ fontSize: '0.94rem', fontWeight: 600, lineHeight: 1.5, color: 'var(--text-primary)', marginBottom: '16px' }}>
+              <HighlightedQuestionText
+                text={errorItem.question_text}
+                wrongWord={errorItem.wrong_word}
+                correctWord={errorItem.correct_word}
+              />
+            </div>
 
+            {/* Render Question Options */}
+            {optionEntries.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {optionEntries.map(([key, text]) => {
+                  const isWrong = errorItem.wrong_option?.toUpperCase() === key.toUpperCase();
                   return (
                     <div
                       key={key}
-                      className={`option-row ${isWrong ? 'wrong-option' : ''}`}
                       style={{
-                        paddingTop: isWrong ? '18px' : '4px',
-                        paddingBottom: '4px'
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        backgroundColor: isWrong ? 'var(--color-red-light)' : 'transparent',
+                        border: isWrong ? '1px solid var(--color-red-border)' : '1px solid transparent',
+                        fontSize: '0.88rem',
+                        lineHeight: 1.45,
+                        display: 'flex',
+                        gap: '8px'
                       }}
                     >
                       <span className="option-key" style={{ color: isWrong ? 'var(--color-red)' : 'inherit' }}>
                         {key})
                       </span>
-                      <div style={{ flex: 1 }}>{renderOptionContent(key, text)}</div>
+                      <div style={{ flex: 1 }}>{renderOptionContent(key, text || '')}</div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div style={{ marginTop: '14px', paddingTop: '16px' }}>
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <span
-                    style={{
-                      display: 'block',
-                      fontFamily: 'var(--font-handwriting)',
-                      color: 'var(--color-red)',
-                      fontSize: '1.4rem',
-                      fontWeight: 700,
-                      marginBottom: '2px'
-                    }}
-                  >
-                    {errorItem.correct_word} <span className="correction-caret">^</span>
-                  </span>
-                  <span className="struck-word" style={{ fontSize: '1.1rem' }}>
-                    {errorItem.wrong_word}
-                  </span>
-                </div>
+              <div style={{ marginTop: '14px', paddingTop: '12px' }}>
+                <del className="struck-word" style={{ fontSize: '1rem' }}>
+                  {errorItem.wrong_word}
+                </del>
+                <span className="correction-badge-inline" style={{ fontSize: '1.25rem' }}>
+                  <span className="caret-arrow">^</span>
+                  <span>{errorItem.correct_word}</span>
+                </span>
               </div>
             )}
           </div>
@@ -153,90 +203,84 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
           {isEditing ? (
             <div className="rule-explanation-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <h4 className="rule-card-title">Kaydı Düzenle</h4>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Yanlış Kelime:</label>
-                <input
-                  className="form-input"
-                  value={editedWrongWord}
-                  onChange={(e) => setEditedWrongWord(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Doğru Yazımı:</label>
-                <input
-                  className="form-input"
-                  value={editedCorrectWord}
-                  onChange={(e) => setEditedCorrectWord(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>TDK Açıklaması:</label>
-                <textarea
-                  className="form-textarea"
-                  value={editedExplanation}
-                  onChange={(e) => setEditedExplanation(e.target.value)}
-                  style={{ minHeight: '80px' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Sana Özel Not:</label>
-                <textarea
-                  className="form-textarea"
-                  value={editedCoachNote}
-                  onChange={(e) => setEditedCoachNote(e.target.value)}
-                  style={{ minHeight: '70px' }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-                <button className="btn-primary" style={{ flex: 1 }} onClick={handleSaveEdit}>
-                  <Check size={18} /> Kaydet
-                </button>
-                <button className="btn-secondary" onClick={() => setIsEditing(false)}>
-                  <X size={18} /> İptal
-                </button>
-              </div>
+              {editError && (
+                <div style={{ padding: '8px 12px', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', borderRadius: '8px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <AlertCircle size={16} />
+                  <span>{editError}</span>
+                </div>
+              )}
+              <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Hatalı Kelime:</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editedWrongWord}
+                    onChange={(e) => setEditedWrongWord(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>TDK Doğrusu:</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editedCorrectWord}
+                    onChange={(e) => setEditedCorrectWord(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Açıklama / Kural Gerekçesi:</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    value={editedExplanation}
+                    onChange={(e) => setEditedExplanation(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Koç Notu (İsteğe Bağlı):</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editedCoachNote}
+                    onChange={(e) => setEditedCoachNote(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <button type="submit" className="btn-primary" style={{ padding: '8px 16px' }}>
+                    <Check size={16} /> Kaydet
+                  </button>
+                  <button type="button" onClick={() => setIsEditing(false)} className="btn-secondary" style={{ padding: '8px 16px' }}>
+                    Vazgeç
+                  </button>
+                </div>
+              </form>
             </div>
           ) : (
             <>
-              {/* Yazım Kuralı Card */}
-              <div className="rule-explanation-card">
-                <div className="rule-card-title">Yazım Kuralı</div>
-                <div className="rule-badge">{errorItem.rule_category}</div>
-                <div className="rule-explanation-text">{errorItem.explanation}</div>
+              {/* TDK Rule & Explanation Card */}
+              <div className="rule-explanation-card" style={{ padding: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <h4 className="rule-card-title" style={{ margin: 0 }}>TDK Kural Gerekçesi</h4>
+                  <span className="rule-badge">{errorItem.rule_category}</span>
+                </div>
+                <p className="rule-card-text" style={{ fontSize: '0.86rem', lineHeight: 1.5, margin: 0 }}>
+                  {errorItem.explanation}
+                </p>
               </div>
 
-              {/* Sana Özel Not Card */}
+              {/* Coach Note */}
               {errorItem.coach_note && (
                 <div className="coach-note-card">
-                  <div className="coach-note-header">Sana Özel Not</div>
+                  <div className="coach-note-header">KOÇ NOTU</div>
                   <div className="coach-note-content">
-                    <Star size={24} className="coach-star-icon" fill="none" strokeWidth={2.2} />
-                    <div className="coach-note-text">{errorItem.coach_note}</div>
+                    ! {errorItem.coach_note}
                   </div>
                 </div>
               )}
             </>
           )}
-        </div>
 
-        {/* Bottom Actions Bar */}
-        <div className="detail-bottom-actions">
-          <button className="detail-action-btn" onClick={() => setIsEditing(!isEditing)}>
-            <Edit3 size={18} />
-            <span>Düzenle</span>
-          </button>
-          <button
-            className="detail-action-btn delete-btn"
-            onClick={() => {
-              if (window.confirm('Bu hata kaydını silmek istediğinden emin misin?')) {
-                onDelete(errorItem.id);
-                onClose();
-              }
-            }}
-          >
-            <Trash2 size={18} />
-            <span>Sil</span>
-          </button>
         </div>
       </div>
     </div>
