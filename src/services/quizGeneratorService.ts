@@ -1,5 +1,9 @@
 import { TytRule, UserError } from '../types';
 import { TYT_RULES } from '../data/rulesData';
+import { groqService } from './groqService';
+import { tdkService, VERIFIED_RULES_DB } from './tdkService';
+import { sentencePoolService } from './sentencePoolService';
+import { authService } from './authService';
 
 export interface QuizConfig {
   questionCount: number;
@@ -111,7 +115,234 @@ function distributeOptionsFairly(questions: DynamicQuizQuestion[]): DynamicQuizQ
   });
 }
 
+const DIVERSE_DISTRACTORS = [
+  "Sanatçı, son romanında geleneksel anlatım kalıplarının dışına çıkmayı başarmış.",
+  "Günün ilk ışıklarıyla birlikte yola çıkıp akşam saatlerinde hedefe vardılar.",
+  "Toplantı salonundaki herkes pürdikkat kesilmiş, konuşmacıyı dinliyordu.",
+  "Günümüz gençleri dijital kaynakları eskisinden çok daha verimli kullanıyor.",
+  "Yapılan son arkeolojik kazılarda önemli tarihi bulgulara rastlandı.",
+  "Yazar, eserinde çocukluk anılarını büyük bir ustalıkla kaleme almış.",
+  "Şehir merkezindeki tarihi yapılar koruma altına alınarak restore ediliyor.",
+  "Bu yılki mezuniyet törenine bütün öğrenci ve veliler davet edildi.",
+  "Yönetmen, filminde insan ilişkilerinin karmaşıklığını ustalıkla işlemiş.",
+  "Kütüphanedeki eski el yazması eserler dijital ortama aktarılıyor.",
+  "Gelişen teknoloji yaşam alışkanlıklarımızı kökten değiştirdi.",
+  "Bilim insanları uzay araştırmalarında çığır açan yeni bir keşif yaptı.",
+  "Geleneksel el sanatları usta ellerde yeniden hayat buluyor.",
+  "Sonbaharın gelmesiyle birlikte ağaçlar sarı ve kızıl yapraklarını dökmeye başladı.",
+  "Müzedeki sergi, sanatseverlerin yoğun ilgisiyle karşılaştı.",
+  "Doğanın sunduğu zenginlikleri korumak hepimizin ortak sorumluluğudur.",
+  "Yıllar önce yaşanan bu olay kasaba halkının hafızasında derin izler bıraktı.",
+  "Tarihi köprünün restorasyonu uzman ekiplerce titizlikle yürütülüyor."
+];
+
+function cleanDistractorSentence(sentence: string): string {
+  if (!sentence) return sentence;
+  let cleaned = sentence;
+  for (const rule of VERIFIED_RULES_DB) {
+    cleaned = cleaned.replace(rule.wrongRegex, rule.correctDisplay);
+  }
+  return cleaned;
+}
+
+function ensureUniqueOptions(
+  options: { A: string; B: string; C: string; D: string; E: string },
+  wrongKey: 'A' | 'B' | 'C' | 'D' | 'E',
+  wrongWord: string
+): { A: string; B: string; C: string; D: string; E: string } {
+  const keys: ('A' | 'B' | 'C' | 'D' | 'E')[] = ['A', 'B', 'C', 'D', 'E'];
+  const result = { ...options };
+  const seenSentences = new Set<string>();
+
+  // Keep wrong option sentence as primary
+  const wrongSentence = (result[wrongKey] || `Bu konuda ${wrongWord} tercihi dikkat çekti.`).trim();
+  result[wrongKey] = wrongSentence;
+  seenSentences.add(wrongSentence.toLocaleLowerCase('tr-TR'));
+
+  let poolIdx = Math.floor(Math.random() * DIVERSE_DISTRACTORS.length);
+
+  for (const k of keys) {
+    if (k === wrongKey) continue;
+    // Clean any accidental spelling errors from distractors (e.g. 'heran' -> 'her an')
+    let current = cleanDistractorSentence((result[k] || '').trim());
+    const lower = current.toLocaleLowerCase('tr-TR');
+
+    // If option is empty, duplicate of another option, or identical to wrongSentence without wrong word
+    const isDuplicate = !current || seenSentences.has(lower) || (
+      lower.replace(/\s+/g, '') === wrongSentence.toLocaleLowerCase('tr-TR').replace(/\s+/g, '')
+    );
+
+    if (isDuplicate) {
+      // Pick a fresh diverse sentence from pool
+      let fresh = DIVERSE_DISTRACTORS[poolIdx % DIVERSE_DISTRACTORS.length];
+      poolIdx++;
+      while (seenSentences.has(fresh.toLocaleLowerCase('tr-TR'))) {
+        fresh = DIVERSE_DISTRACTORS[poolIdx % DIVERSE_DISTRACTORS.length];
+        poolIdx++;
+      }
+      result[k] = cleanDistractorSentence(fresh);
+      seenSentences.add(result[k].toLocaleLowerCase('tr-TR'));
+    } else {
+      result[k] = current;
+      seenSentences.add(lower);
+    }
+  }
+
+  return result;
+}
+
 export const quizGeneratorService = {
+  /**
+   * Generates dynamic questions based on student's mistakes & TYT rules using AI with local fallback.
+   * Intersperses student's personal errors throughout the exam so they are not clumped at the beginning.
+   */
+  async generateCustomQuiz(
+    userErrors: UserError[] = [],
+    config: QuizConfig
+  ): Promise<DynamicQuizQuestion[]> {
+    const count = Math.min(Math.max(config.questionCount || 10, 1), 30);
+    const category = (config.selectedCategory || config.category) && (config.selectedCategory || config.category) !== 'Tümü'
+      ? (config.selectedCategory || config.category)
+      : undefined;
+
+    // 1. Filter student errors and available curriculum rules
+    let filteredErrors = [...userErrors];
+    if (category) {
+      filteredErrors = filteredErrors.filter(e => e.rule_category === category);
+    }
+
+    let availableRules = [...TYT_RULES];
+    if (category) {
+      availableRules = availableRules.filter(r => r.category === category);
+      if (availableRules.length === 0) availableRules = [...TYT_RULES];
+    }
+
+    const userTargets: { wrong_word: string; correct_word: string; category: string }[] = [];
+    const inspirationSnippets: string[] = [];
+    const seenWords = new Set<string>();
+
+    // 2. Gather user's personal mistake targets (Unique words)
+    const shuffledErrors = shuffleArray(filteredErrors);
+    for (const err of shuffledErrors) {
+      if (userTargets.length >= count) break;
+      const cleanWrong = (err.wrong_word || '').trim();
+      const cleanCorrect = (err.correct_word || '').trim();
+      if (cleanWrong && cleanCorrect && !seenWords.has(cleanWrong.toLocaleLowerCase('tr-TR'))) {
+        userTargets.push({
+          wrong_word: cleanWrong,
+          correct_word: cleanCorrect,
+          category: err.rule_category || 'Ayrı Yazılan Kelimeler'
+        });
+        seenWords.add(cleanWrong.toLocaleLowerCase('tr-TR'));
+        if (err.question_text) {
+          inspirationSnippets.push(err.question_text);
+        }
+      }
+    }
+
+    // 3. Gather general TYT curriculum rules for remaining slots
+    const curriculumTargets: { wrong_word: string; correct_word: string; category: string }[] = [];
+    const shuffledRules = shuffleArray(availableRules);
+    for (const rule of shuffledRules) {
+      if (userTargets.length + curriculumTargets.length >= count) break;
+      const example = rule.examples[Math.floor(Math.random() * rule.examples.length)];
+      if (example && !seenWords.has(example.wrong.toLocaleLowerCase('tr-TR'))) {
+        curriculumTargets.push({
+          wrong_word: example.wrong,
+          correct_word: example.correct,
+          category: rule.category
+        });
+        seenWords.add(example.wrong.toLocaleLowerCase('tr-TR'));
+      }
+    }
+
+    // 4. For 15-question exams: Synthesize up to 3 questions from 30-day fresh sentence pool to accelerate speed
+    const currentUser = authService.getCurrentUser();
+    const userId = currentUser?.id || 'local-user';
+
+    let synthesizedQuestions: DynamicQuizQuestion[] = [];
+    let neededAiCount = count;
+
+    if (count === 15) {
+      try {
+        synthesizedQuestions = await sentencePoolService.getFreshSynthesizedQuestions(3, userId, category);
+        neededAiCount = Math.max(1, count - synthesizedQuestions.length);
+      } catch (err) {
+        console.warn('Sentence pool synthesis skipped:', err);
+      }
+    }
+
+    const aiTargets = shuffleArray([...userTargets, ...curriculumTargets]).slice(0, neededAiCount);
+
+    // 5. Attempt High-Speed Parallel AI Generation via Groq / OpenRouter LLaMA-3.3 70B
+    try {
+      if (aiTargets.length > 0) {
+        const aiGenerated = await groqService.generateAIQuestionsBatch(aiTargets, config.difficulty, inspirationSnippets);
+        if (Array.isArray(aiGenerated) && aiGenerated.length > 0) {
+          const validatedQuestions: DynamicQuizQuestion[] = aiGenerated.map((q, idx) => {
+            const wrongOpt: 'A' | 'B' | 'C' | 'D' | 'E' = (['A', 'B', 'C', 'D', 'E'].includes(q.wrong_option?.toUpperCase())
+              ? q.wrong_option.toUpperCase()
+              : 'A') as any;
+
+            const wrongW = q.wrong_word || aiTargets[idx]?.wrong_word || 'yanlış';
+            const rawOpts = {
+              A: q.options?.A || 'Sanatçı bu eserinde farklı bir üslup denemiş.',
+              B: q.options?.B || 'Günün ilk saatlerinde sokaklarda kimsecikler yoktu.',
+              C: q.options?.C || 'Gelişen teknoloji yaşam alışkanlıklarımızı değiştirdi.',
+              D: q.options?.D || 'Toplantıdaki herkes öneriyi dikkatle değerlendirdi.',
+              E: q.options?.E || 'Geçmişte yaşanan deneyimler geleceğe ışık tutar.'
+            };
+
+            const uniqueOpts = ensureUniqueOptions(rawOpts, wrongOpt, wrongW);
+
+            return {
+              id: `ai-quiz-${idx + 1}-${Date.now()}`,
+              question_text: q.question_text || 'Aşağıdaki cümlelerin hangisinde bir yazım yanlışı yapılmıştır?',
+              options: uniqueOpts,
+              wrong_option: wrongOpt,
+              wrong_word: wrongW,
+              correct_word: q.correct_word || aiTargets[idx]?.correct_word || 'doğru',
+              rule_category: q.rule_category || aiTargets[idx]?.category || 'Ayrı Yazılan Kelimeler',
+              explanation: q.explanation || 'TDK yazım kurallarına uygunluk kontrol edildi.',
+              coach_note: tdkService.sanitizeCoachNote(q.coach_note, wrongW, q.correct_word, q.rule_category),
+              difficulty: config.difficulty
+            };
+          });
+
+          // Ingest newly generated questions into sentence pool for future rotation
+          sentencePoolService.ingestQuestions(validatedQuestions, userId).catch((e) =>
+            console.warn('Sentence pool ingestion error:', e)
+          );
+
+          const combinedQuestions = shuffleArray([...synthesizedQuestions, ...validatedQuestions]);
+
+          // If combined is less than count (e.g. API rate limit), complete remaining with rich curriculum engine
+          if (combinedQuestions.length > 0) {
+            if (combinedQuestions.length < count) {
+              const missingCount = count - combinedQuestions.length;
+              const backupQuestions = this.generateExamQuestions(
+                { ...config, questionCount: missingCount },
+                userErrors
+              );
+              combinedQuestions.push(...backupQuestions);
+            }
+            return distributeOptionsFairly(combinedQuestions.slice(0, count));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('AI Quiz batch generation fallback to local engine:', err);
+    }
+
+    // 6. Robust Offline Fallback Engine (with rich diverse sentences)
+    const fallbackList = [...synthesizedQuestions];
+    if (fallbackList.length < count) {
+      const needed = count - fallbackList.length;
+      fallbackList.push(...this.generateExamQuestions({ ...config, questionCount: needed }, userErrors));
+    }
+    return distributeOptionsFairly(fallbackList.slice(0, count));
+  },
+
   generateExamQuestions(
     config: QuizConfig,
     userErrors: UserError[] = []
@@ -132,52 +363,54 @@ export const quizGeneratorService = {
     const shuffledRules = shuffleArray(availableRules);
     const questions: DynamicQuizQuestion[] = [];
 
+    const naturalContexts = [
+      (word: string) => `Yazarın son kitabında '${word}' ifadesini kullanması eleştirmenlerin dikkatinden kaçmadı.`,
+      (word: string) => `Dünkü konferansta konuşmacı '${word}' biçimindeki kullanımı özellikle vurguladı.`,
+      (word: string) => `Gazetedeki köşe yazısında geçen '${word}' yapısı okurların ilgisini çekti.`,
+      (word: string) => `Edebi metinlerde '${word}' sözünün yer alması dil tartışmalarına yol açtı.`,
+      (word: string) => `Tiyatro oyununun afişinde '${word}' yazılması izleyiciler arasında konuşuldu.`,
+      (word: string) => `Sınav hazırlık metinlerinde '${word}' örneği sıkça karşımıza çıkmaktadır.`
+    ];
+
     for (let i = 0; i < count; i++) {
       const rule = shuffledRules[i % shuffledRules.length];
-      const otherRules = shuffleArray(TYT_RULES.filter(r => r.id !== rule.id)).slice(0, 4);
-
       const wrongOptionKey: 'A' | 'B' | 'C' | 'D' | 'E' = ['A', 'B', 'C', 'D', 'E'][i % 5] as any;
       const example = rule.examples[Math.floor(Math.random() * rule.examples.length)] || {
         wrong: 'yanlış',
         correct: 'doğru'
       };
 
-      const options: any = {};
+      const rawOptions: any = {};
       const keys: ('A' | 'B' | 'C' | 'D' | 'E')[] = ['A', 'B', 'C', 'D', 'E'];
 
-      let otherIdx = 0;
+      const contextFn = naturalContexts[i % naturalContexts.length];
+      rawOptions[wrongOptionKey] = contextFn(example.wrong);
+
+      let distIdx = (i * 4) % DIVERSE_DISTRACTORS.length;
       keys.forEach(k => {
-        if (k === wrongOptionKey) {
-          options[k] = `Bu konuda ${example.wrong} sözcüğü tercih edildi.`;
-        } else {
-          const otherRule = otherRules[otherIdx++] || rule;
-          const otherEx = otherRule.examples[0] || { correct: 'örnek sözcük' };
-          options[k] = `Cümle içerisinde ${otherEx.correct} kuralına uygun yazıldı.`;
+        if (k !== wrongOptionKey) {
+          rawOptions[k] = DIVERSE_DISTRACTORS[distIdx % DIVERSE_DISTRACTORS.length];
+          distIdx++;
         }
       });
+
+      const uniqueOpts = ensureUniqueOptions(rawOptions, wrongOptionKey, example.wrong);
 
       questions.push({
         id: `quiz-q-${i + 1}-${Date.now()}`,
         question_text: 'Aşağıdaki cümlelerin hangisinde bir yazım yanlışı yapılmıştır?',
-        options,
+        options: uniqueOpts,
         wrong_option: wrongOptionKey,
         wrong_word: example.wrong,
         correct_word: example.correct,
         rule_category: rule.category,
         explanation: rule.description,
-        coach_note: rule.tip,
+        coach_note: tdkService.sanitizeCoachNote(rule.tip, example.wrong, example.correct, rule.category),
         difficulty: config.difficulty
       });
     }
 
     return distributeOptionsFairly(questions);
-  },
-
-  async generateCustomQuiz(
-    userErrors: UserError[],
-    config: QuizConfig
-  ): Promise<DynamicQuizQuestion[]> {
-    return this.generateExamQuestions(config, userErrors);
   },
 
   getOrGenerateQuizQuestions(arg1: any, arg2?: any): DynamicQuizQuestion[] {
