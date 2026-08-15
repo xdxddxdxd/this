@@ -257,7 +257,7 @@ export const quizGeneratorService = {
     }
 
     // 4. For 15-question exams: Synthesize up to 3 questions from 30-day fresh sentence pool to accelerate speed
-    const currentUser = authService.getCurrentUser();
+    const currentUser = await authService.getCurrentUser();
     const userId = currentUser?.id || 'local-user';
 
     let synthesizedQuestions: DynamicQuizQuestion[] = [];
