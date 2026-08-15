@@ -13,10 +13,16 @@ export const geminiService = {
 
     const cleanBase64 = base64Image.replace(/^data:image\/[a-z]+;base64,/, '');
 
-    const prompt = `Sen Türkiye TYT/YKS Türkçe sınavı ve TDK yazım kuralları uzmanısın.
-Görseldeki Türkçe yazım yanlışı sorusunu/sorularını harfiyen oku ve metne dök.
-Tüm soru köklerini, paragrafları ve A, B, C, D, E seçeneklerini eksiksiz aktar.
-Sadece soru metnini yaz, ek açıklama ekleme.`;
+    const prompt = `Sen Türkiye TYT/YKS Türkçe sınav formatı ve TDK Yazım Kuralları konusunda uzmanlaşmış yüksek hassasiyetli bir OCR asistanısın.
+
+GÖREVİN:
+Görseldeki Türkçe yazım kuralları sorusunu/sorularını tek bir harf veya noktalama işaretini bile atlamadan, en yüksek doğrulukla dijital metne dönüştürmektir.
+
+KRİTİK DİKKAT EDİLECEK NOKTALAR:
+1. ŞIKLAR: A), B), C), D), E) seçeneklerini her biri ayrı bir satırda olacak şekilde eksiksiz aktar.
+2. PARAGRAF VE METİN: Paragraf içerisindeki altı çizili veya numaralandırılmış sözcükleri (I, II, III, IV, V) orijinal sırasıyla ve tam yazılışlarıyla koru.
+3. BÜYÜK/KÜÇÜK HARF & KESME İŞARETLERİ: Yazım yanlışı sorularında tek bir harf veya kesme işareti hayati önem taşır; kelimelerin büyük/küçük harf durumunu ve birleşik/ayrı yazılışını birebir aktar.
+4. ÇIKTI TEMİZLİĞİ: Sadece ve sadece soru metnini ve şıkları yaz. Başına veya sonuna hiçbir selamlama, açıklama veya yorum ekleme.`;
 
     const result = await model.generateContent([
       prompt,
@@ -28,6 +34,6 @@ Sadece soru metnini yaz, ek açıklama ekleme.`;
       }
     ]);
 
-    return result.response.text();
+    return result.response.text().trim();
   }
 };
