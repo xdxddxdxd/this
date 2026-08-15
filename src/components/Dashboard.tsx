@@ -1,235 +1,155 @@
 import React from 'react';
-import { Bookmark, PenLine, Type, Camera, ChevronRight, Edit } from 'lucide-react';
-import { User, UserError } from '../types';
-import { errorService } from '../services/errorService';
+import { Plus, BookOpen, AlertTriangle, Sparkles, Star, ChevronRight } from 'lucide-react';
+import { UserError } from '../types';
+import { GET_RANDOM_RULE } from '../data/rulesData';
 
 interface DashboardProps {
-  user: User;
   errors: UserError[];
-  onOpenAddModal: (mode: 'text' | 'photo') => void;
+  onOpenAddModal: () => void;
+  onOpenQuizModal: () => void;
   onSelectError: (error: UserError) => void;
-  onViewAllErrors: () => void;
-  onToggleFavorite: (id: string, isFav: boolean) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  user,
   errors,
   onOpenAddModal,
-  onSelectError,
-  onViewAllErrors,
-  onToggleFavorite
+  onOpenQuizModal,
+  onSelectError
 }) => {
-  const topRule = errorService.getTopMistakenRule(errors);
-  const recentErrors = errors.slice(0, 3);
-  const totalCount = errors.length;
-
-  const formatDate = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  // Helper to render the red pen correction preview inside a card
-  const renderCardSnippet = (item: UserError) => {
-    const wrongWord = item.wrong_word;
-    const correctWord = item.correct_word;
-
-    // Pick first option text or fallback to question text
-    let targetText = item.question_text;
-    if (item.options && item.wrong_option && item.options[item.wrong_option]) {
-      targetText = item.options[item.wrong_option]!;
-    } else if (item.options && Object.values(item.options).length > 0) {
-      targetText = Object.values(item.options)[0] || item.question_text;
-    }
-
-    const lowerTarget = targetText.toLocaleLowerCase('tr-TR');
-    const lowerWrong = wrongWord.toLocaleLowerCase('tr-TR');
-    const idx = lowerTarget.indexOf(lowerWrong);
-
-    if (idx === -1) {
-      return (
-        <div className="snippet-text">
-          <div style={{ lineHeight: 1.7 }}>
-            <del className="struck-word">{wrongWord}</del>
-            <span className="correction-badge-inline">
-              <span className="caret-arrow">^</span>
-              <span>{correctWord}</span>
-            </span>{' '}
-            <span>{targetText}</span>
-          </div>
-        </div>
-      );
-    }
-
-    const before = targetText.substring(0, idx);
-    const matched = targetText.substring(idx, idx + wrongWord.length);
-    const after = targetText.substring(idx + wrongWord.length);
-
-    return (
-      <div className="snippet-text">
-        <div style={{ lineHeight: 1.7 }}>
-          {before}
-          <del className="struck-word">{matched}</del>
-          <span className="correction-badge-inline">
-            <span className="caret-arrow">^</span>
-            <span>{correctWord}</span>
-          </span>
-          {after}
-        </div>
-      </div>
-    );
-  };
+  const dailyRule = React.useMemo(() => GET_RANDOM_RULE(), []);
+  const recentErrors = errors.slice(0, 4);
+  const favoriteErrors = errors.filter(e => e.is_favorite);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingBottom: '30px' }}>
-      {/* 1. Header (Greeting + Notebook Counter) */}
-      <header className="top-header">
-        <div>
-          <h1 className="greeting-title">
-            Merhaba, {user.full_name || 'Öğrenci'} <span className="red-dot" />
-          </h1>
-          <p className="greeting-subtitle">Bugün biraz daha iyi yazalım.</p>
-        </div>
-
-        {/* Notebook Counter Card */}
-        <div className="stat-counter-card">
-          <div className="stat-label-top">Toplam Kayıtlı Hata</div>
-          <div className="stat-number">{totalCount}</div>
-          <div className="stat-label-bottom">kelime</div>
-        </div>
-      </header>
-
-      {/* 2. Central "Soru Ekle" Box */}
-      <section className="add-question-box">
-        <div className="add-question-header">
-          <div className="add-question-info">
-            <div className="pencil-icon-badge">
-              <PenLine size={20} />
-            </div>
-            <h2 className="add-question-title">Soru Ekle</h2>
-            <p className="add-question-desc">
-              Yaz veya fotoğraf çek.<br />Hataları birlikte bulalım.
+    <div className="dashboard-container" style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Hero Welcome Banner */}
+      <div className="hero-banner" style={{
+        background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-secondary) 100%)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '16px',
+        padding: '20px',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-red)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              TDK & ÖSYM TYT HAZIRLIK
+            </span>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-serif)', marginTop: '4px', marginBottom: '8px' }}>
+              Hatalarından Güç Doğar
+            </h2>
+            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', maxWidth: '280px', lineHeight: 1.45 }}>
+              Denemelerde yanlış yaptığın kelimeleri biriktir, kişiselleştirilmiş TYT testleriyle pekiştir.
             </p>
           </div>
+        </div>
 
-          {/* Big Red Hand-Drawn Circle Button */}
+        <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
           <button
-            className="hand-drawn-circle-btn"
-            onClick={() => onOpenAddModal('text')}
-            aria-label="Yeni Soru Ekle"
+            onClick={onOpenAddModal}
+            className="btn-primary"
+            style={{ padding: '10px 16px', fontSize: '0.88rem' }}
           >
-            <svg className="hand-drawn-circle-svg" viewBox="0 0 60 60">
-              <circle
-                cx="30"
-                cy="30"
-                r="26"
-                fill="none"
-                stroke="var(--color-red)"
-                strokeWidth="2.8"
-                strokeDasharray="140 10"
-                transform="rotate(-15 30 30)"
-              />
-            </svg>
-            <span className="plus-icon" style={{ fontSize: '2rem', lineHeight: 1 }}>+</span>
+            <Plus size={18} /> Soru / Metin Ekle
+          </button>
+          <button
+            onClick={onOpenQuizModal}
+            className="btn-secondary"
+            style={{ padding: '10px 16px', fontSize: '0.88rem' }}
+          >
+            <Sparkles size={18} color="var(--color-red)" /> Sınav Oluştur
           </button>
         </div>
-
-        {/* Two Quick Action Buttons */}
-        <div className="add-actions-row">
-          <button className="action-sub-btn" onClick={() => onOpenAddModal('text')}>
-            <div className="btn-icon-wrapper">
-              <Type size={18} />
-            </div>
-            <div>
-              <div className="btn-label-title">Metin Yapıştır</div>
-              <div className="btn-label-sub">Yapıştır ve analiz et</div>
-            </div>
-          </button>
-
-          <button className="action-sub-btn" onClick={() => onOpenAddModal('photo')}>
-            <div className="btn-icon-wrapper">
-              <Camera size={18} />
-            </div>
-            <div>
-              <div className="btn-label-title">Fotoğraf Çek</div>
-              <div className="btn-label-sub">Soruyu tara ve yükle</div>
-            </div>
-          </button>
-        </div>
-      </section>
-
-      {/* 3. Monthly Highlight Banner */}
-      <div className="monthly-highlight">
-        <span>📌</span>
-        <span>
-          Bu ay en çok karıştırdığın kural: <strong>{topRule}</strong>
-        </span>
       </div>
 
-      {/* 4. Section: Son Eklenen Hatalar */}
-      <section>
-        <div className="section-header">
-          <h3 className="section-title">Son Eklenen Hatalar</h3>
-          <button
-            className="section-link"
-            style={{ background: 'none', border: 'none' }}
-            onClick={onViewAllErrors}
-          >
-            <span>Tümünü Gör</span>
-            <ChevronRight size={15} />
-          </button>
+      {/* Stats Counter Bar */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+        <div className="stat-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '14px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-red)' }}>{errors.length}</div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Kayıtlı Hata</div>
         </div>
-
-        {/* Error Cards List */}
-        <div className="error-cards-list">
-          {recentErrors.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)' }}>
-              Henüz kaydedilmiş bir yazım hatası yok. Yukarıdaki <strong>Soru Ekle</strong> butonundan ilk sorunu ekleyebilirsin!
-            </div>
-          ) : (
-            recentErrors.map((item) => (
-              <div
-                key={item.id}
-                className="error-paper-card"
-                onClick={() => onSelectError(item)}
-              >
-                <div className="quote-mark">“</div>
-                <div className="card-content-left">
-                  {renderCardSnippet(item)}
-                </div>
-
-                <div className="card-meta-right">
-                  <span className="rule-badge">{item.rule_category}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="card-date">{formatDate(item.created_at)}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleFavorite(item.id, !item.is_favorite);
-                      }}
-                      style={{ background: 'none', border: 'none' }}
-                      className={`bookmark-icon ${item.is_favorite ? 'active' : ''}`}
-                    >
-                      <Bookmark size={16} fill={item.is_favorite ? 'var(--color-red)' : 'none'} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+        <div className="stat-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '14px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)' }}>{favoriteErrors.length}</div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Yıldızlılar</div>
         </div>
+        <div className="stat-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '14px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#22c55e' }}>%100</div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 600 }}>TDK Uyum</div>
+        </div>
+      </div>
 
-        {recentErrors.length > 0 && (
-          <div className="footer-info-note">
-            <Edit size={14} />
-            <span>En son eklenen {recentErrors.length} hata gösteriliyor.</span>
+      {/* Daily Rule Flashcard */}
+      <div style={{
+        backgroundColor: 'var(--bg-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '14px',
+        padding: '16px',
+        borderLeft: '4px solid var(--color-red)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+          <span className="flashcard-badge" style={{ margin: 0 }}>GÜNÜN TDK KURALI</span>
+          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{dailyRule.category}</span>
+        </div>
+        <h4 style={{ fontSize: '0.98rem', fontWeight: 700, fontFamily: 'var(--font-serif)', margin: '4px 0 6px 0' }}>
+          {dailyRule.title}
+        </h4>
+        <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.45, margin: 0 }}>
+          {dailyRule.description}
+        </p>
+        {dailyRule.tip && (
+          <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+            💡 {dailyRule.tip}
           </div>
         )}
-      </section>
+      </div>
+
+      {/* Recent Errors Section */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-serif)' }}>
+            Son Eklenen Hatalar
+          </h3>
+        </div>
+
+        {recentErrors.length === 0 ? (
+          <div style={{ padding: '30px 16px', textAlign: 'center', background: 'var(--bg-card)', border: '1px dashed var(--color-border)', borderRadius: '12px' }}>
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: 0 }}>
+              Henüz soru eklemedin. Çözdüğün denemelerden soru ekleyerek havuzunu oluştur!
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {recentErrors.map((err) => (
+              <div
+                key={err.id}
+                onClick={() => onSelectError(err)}
+                style={{
+                  padding: '12px 14px',
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <del className="struck-word" style={{ fontSize: '0.88rem' }}>{err.wrong_word}</del>
+                    <span style={{ color: 'var(--color-red)', fontWeight: 700, fontSize: '0.84rem' }}>➔</span>
+                    <span className="correction-badge-inline" style={{ fontSize: '0.88rem' }}>^ {err.correct_word}</span>
+                  </div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{err.rule_category}</span>
+                </div>
+                <ChevronRight size={16} color="var(--text-muted)" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

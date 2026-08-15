@@ -1,135 +1,80 @@
 import React, { useState } from 'react';
-import { X, UserPlus, LogIn, Sparkles } from 'lucide-react';
+import { X, UserPlus, Users, Sparkles, Check, AlertCircle } from 'lucide-react';
 import { authService } from '../services/authService';
-import { User } from '../types';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (user: User) => void;
+  onSuccess: () => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+export const AuthModal: React.FC<AuthModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess
+}) => {
+  const [activeTab, setActiveTab] = useState<'switch' | 'create'>('switch');
+  const [newName, setNewName] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) {
-      setErrorMsg('Lütfen bir kullanıcı adı girin.');
+    if (!newName.trim()) {
+      setError('Lütfen bir isim veya kullanıcı adı girin.');
       return;
     }
-
-    setIsLoading(true);
-    setErrorMsg('');
-
-    try {
-      if (isRegister) {
-        const res = await authService.register(username, fullName, password || '123456');
-        if (res.user) {
-          onSuccess(res.user);
-          onClose();
-        } else {
-          setErrorMsg(res.error || 'Kayıt sırasında bir hata oluştu.');
-        }
-      } else {
-        const res = await authService.login(username, password || '123456');
-        if (res.user) {
-          onSuccess(res.user);
-          onClose();
-        } else {
-          setErrorMsg(res.error || 'Giriş yapılamadı.');
-        }
-      }
-    } catch (err: any) {
-      setErrorMsg('İşlem başarısız oldu.');
-    } finally {
-      setIsLoading(false);
-    }
+    onSuccess();
+    onClose();
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px' }}>
-        <div style={{ padding: '20px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 700 }}>
-            {isRegister ? 'Yeni Arkadaş Kaydı' : 'Kullanıcı Girişi'}
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '420px', padding: '24px' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, fontFamily: 'var(--font-serif)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Users size={20} color="var(--color-red)" />
+            Profil & Kullanıcı
           </h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {errorMsg && (
-            <div style={{ padding: '8px 12px', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', borderRadius: '8px', fontSize: '0.82rem' }}>
-              {errorMsg}
-            </div>
-          )}
+        {error && (
+          <div style={{ padding: '10px 14px', backgroundColor: 'var(--color-red-light)', color: 'var(--color-red)', borderRadius: '10px', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
 
-          {isRegister && (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-                Adın & Soyadın
-              </label>
-              <input
-                className="form-input"
-                placeholder="Örn: Doğukan"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
-            </div>
-          )}
-
+        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-              Kullanıcı Adı
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              Öğrenci / Profil Adı:
             </label>
             <input
+              type="text"
               className="form-input"
-              placeholder="Örn: dogukan"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
+              placeholder="Örn: Mehmet Ali"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              autoFocus
             />
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-              Şifre (İsteğe bağlı)
-            </label>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          <button type="submit" className="btn-primary" disabled={isLoading} style={{ marginTop: '8px' }}>
-            {isLoading ? 'Lütfen bekleyin...' : isRegister ? <UserPlus size={18} /> : <LogIn size={18} />}
-            {isRegister ? 'Kayıt Ol ve Başla' : 'Giriş Yap'}
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ width: '100%', padding: '12px', justifyContent: 'center', marginTop: '6px' }}
+          >
+            <Check size={18} /> Kaydet ve Devam Et
           </button>
-
-          <div style={{ textAlign: 'center', marginTop: '6px' }}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsRegister(!isRegister);
-                setErrorMsg('');
-              }}
-              style={{ background: 'none', border: 'none', color: 'var(--color-red)', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600 }}
-            >
-              {isRegister ? 'Zaten hesabın var mı? Giriş Yap' : 'Yeni kullanıcı mısın? Buradan Kaydol'}
-            </button>
-          </div>
         </form>
       </div>
     </div>
