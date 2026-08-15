@@ -1,9 +1,10 @@
 export interface User {
   id: string;
-  username: string;
+  username?: string;
+  email?: string;
   full_name: string;
   avatar_url?: string;
-  created_at: string;
+  created_at?: string;
 }
 
 export interface QuestionOptions {
@@ -29,7 +30,7 @@ export interface UserError {
   difficulty_score?: number; // 1-10 (strictly background only)
   is_favorite?: boolean;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface TdkCacheEntry {

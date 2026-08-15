@@ -1,5 +1,3 @@
-import { UserError } from '../types';
-
 export const authService = {
   getCurrentUser() {
     return {
@@ -9,6 +7,34 @@ export const authService = {
         full_name: 'YKS Adayı',
         avatar_url: ''
       }
+    };
+  },
+
+  async login(usernameOrEmail: string, _password?: string): Promise<{ success: boolean; user: any; error: string | null }> {
+    return {
+      success: true,
+      user: {
+        id: 'local-user',
+        username: usernameOrEmail,
+        email: usernameOrEmail.includes('@') ? usernameOrEmail : `${usernameOrEmail}@yks-hedef.com`,
+        full_name: usernameOrEmail,
+        created_at: new Date().toISOString()
+      },
+      error: null
+    };
+  },
+
+  async register(usernameOrEmail: string, fullName?: string, _password?: string): Promise<{ success: boolean; user: any; error: string | null }> {
+    return {
+      success: true,
+      user: {
+        id: 'local-user',
+        username: usernameOrEmail,
+        email: usernameOrEmail.includes('@') ? usernameOrEmail : `${usernameOrEmail}@yks-hedef.com`,
+        full_name: fullName || usernameOrEmail,
+        created_at: new Date().toISOString()
+      },
+      error: null
     };
   },
 

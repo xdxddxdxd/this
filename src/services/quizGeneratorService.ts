@@ -5,6 +5,8 @@ export interface QuizConfig {
   questionCount: number;
   difficulty: 'kolay' | 'orta' | 'zor';
   category?: string;
+  selectedCategory?: string;
+  durationMinutes?: number;
 }
 
 export interface DynamicQuizQuestion {
@@ -115,7 +117,9 @@ export const quizGeneratorService = {
     userErrors: UserError[] = []
   ): DynamicQuizQuestion[] {
     const count = Math.min(Math.max(config.questionCount || 10, 1), 30);
-    const category = config.category && config.category !== 'Tümü' ? config.category : undefined;
+    const category = (config.selectedCategory || config.category) && (config.selectedCategory || config.category) !== 'Tümü'
+      ? (config.selectedCategory || config.category)
+      : undefined;
 
     let availableRules = [...TYT_RULES];
     if (category) {
@@ -167,5 +171,26 @@ export const quizGeneratorService = {
     }
 
     return distributeOptionsFairly(questions);
+  },
+
+  async generateCustomQuiz(
+    userErrors: UserError[],
+    config: QuizConfig
+  ): Promise<DynamicQuizQuestion[]> {
+    return this.generateExamQuestions(config, userErrors);
+  },
+
+  getOrGenerateQuizQuestions(arg1: any, arg2?: any): DynamicQuizQuestion[] {
+    if (Array.isArray(arg1)) {
+      return this.generateExamQuestions({ questionCount: 10, difficulty: 'orta' }, arg1);
+    }
+    return this.generateExamQuestions(arg1 || { questionCount: 10, difficulty: 'orta' }, arg2 || []);
+  },
+
+  regenerateAll(arg1: any, arg2?: any): DynamicQuizQuestion[] {
+    if (Array.isArray(arg1)) {
+      return this.generateExamQuestions({ questionCount: 10, difficulty: 'orta' }, arg1);
+    }
+    return this.generateExamQuestions(arg1 || { questionCount: 10, difficulty: 'orta' }, arg2 || []);
   }
 };
