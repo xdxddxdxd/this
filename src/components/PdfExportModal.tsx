@@ -1,20 +1,33 @@
-import React from 'react';
-import { X, Printer, Download, BookOpen, Check } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { X, Printer, BookOpen } from 'lucide-react';
 import { User, UserError } from '../types';
 
 interface PdfExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: User;
+  user?: User;
   errors: UserError[];
 }
 
 export const PdfExportModal: React.FC<PdfExportModalProps> = ({
   isOpen,
   onClose,
-  user,
+  user = { id: 'local-user', email: 'ogrenci@yks-hedef.com', full_name: 'YKS Adayı', created_at: '' },
   errors
 }) => {
+  // Esc key listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handlePrint = () => {
@@ -24,7 +37,7 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
   const optionKeys = ['A', 'B', 'C', 'D', 'E'] as const;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div
         className="modal-content printable-modal-content"
         onClick={(e) => e.stopPropagation()}
@@ -43,156 +56,125 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Non-Print Action Bar */}
-        <div className="no-print" style={{ padding: '12px 20px', backgroundColor: 'var(--bg-card-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)' }}>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            Toplam <strong>{errors.length} soru</strong> yazdırılabilir A4 formatında hazırlandı.
-          </div>
-          <button className="btn-primary" onClick={handlePrint} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
-            <Printer size={16} /> Yazdır / PDF İndir
-          </button>
-        </div>
-
-        {/* Printable Document Area */}
-        <div className="printable-booklet-body" style={{ padding: '24px', overflowY: 'auto' }}>
-          
-          {/* Booklet Header */}
-          <div className="booklet-cover-header" style={{ textAlign: 'center', paddingBottom: '18px', marginBottom: '20px', borderBottom: '2px solid var(--text-primary)' }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-red)', marginBottom: '4px' }}>
-              ÖSYM & TDK HAZIRLIK REHBERİ
+        {/* Printable Document Paper */}
+        <div className="print-area" style={{ padding: '24px', overflowY: 'auto', maxHeight: 'calc(90vh - 130px)' }}>
+          {/* Cover / Booklet Header */}
+          <div style={{ borderBottom: '2px solid #1C1C1E', paddingBottom: '12px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div>
+              <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 800, margin: 0, color: '#1C1C1E' }}>
+                TYT TÜRKÇE YAZIM KURALLARI
+              </h1>
+              <div style={{ fontSize: '0.85rem', color: '#636366', marginTop: '2px', fontWeight: 600 }}>
+                Kişiye Özel Sınav Öncesi Hata Tekrar Kitapçığı
+              </div>
             </div>
-            <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
-              KİŞİSEL TYT TÜRKÇE YAZIM KURALLARI HATA KİTAPÇIĞI
-            </h1>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'center', gap: '16px' }}>
-              <span><strong>Öğrenci:</strong> {user.full_name || user.username} (@{user.username})</span>
-              <span>•</span>
-              <span><strong>Toplam Soru:</strong> {errors.length} Soru</span>
-              <span>•</span>
-              <span><strong>Tarih:</strong> {new Date().toLocaleDateString('tr-TR')}</span>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1C1C1E' }}>{user.full_name}</div>
+              <div style={{ fontSize: '0.75rem', color: '#8E8E93' }}>
+                {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </div>
             </div>
           </div>
 
-          {/* List of Full Questions */}
+          {/* Booklet Intro Box */}
+          <div style={{ backgroundColor: '#F2F2F7', border: '1px solid #D1D1D6', padding: '10px 14px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.82rem', color: '#3A3A3C', lineHeight: 1.4 }}>
+            💡 Bu kitapçık, çalışma sürecinde sistemde en çok hata yaptığın <strong>{errors.length} adet</strong> sorunun analizi ve TDK kural notlarından derlenmiştir. Sınavdan 1 gün önce hızlıca gözden geçirmen önerilir.
+          </div>
+
+          {/* Questions Stream */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {errors.map((item, index) => {
-              const hasOptions = item.options && Object.keys(item.options).length > 0;
-              const wrongWord = item.wrong_word || '';
-              const correctWord = item.correct_word || '';
+              const wrongWord = item.wrong_word;
+              const correctWord = item.correct_word;
 
               return (
                 <div
                   key={item.id}
-                  className="booklet-question-item"
                   style={{
-                    backgroundColor: 'var(--bg-card)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '12px',
-                    padding: '16px 18px',
+                    border: '1px solid #D1D1D6',
+                    borderRadius: '10px',
+                    padding: '16px',
+                    backgroundColor: '#FFFFFF',
+                    color: '#1C1C1E',
                     pageBreakInside: 'avoid'
                   }}
                 >
-                  {/* Question Stem */}
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <span style={{ fontWeight: 800, fontFamily: 'var(--font-serif)', fontSize: '1rem', color: 'var(--text-primary)' }}>
-                      {index + 1}.
+                  {/* Item Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#D6303F' }}>
+                      SORU {index + 1}
                     </span>
-                    <div style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.55 }}>
-                      {item.question_text}
-                    </div>
+                    <span style={{ fontSize: '0.75rem', backgroundColor: '#E5E5EA', padding: '2px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                      {item.rule_category}
+                    </span>
+                  </div>
+
+                  {/* Question Prompt */}
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, lineHeight: 1.45, marginBottom: '10px' }}>
+                    {item.question_text}
                   </div>
 
                   {/* Options */}
-                  {hasOptions && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '16px', marginBottom: '12px' }}>
-                      {optionKeys.map((k) => {
-                        const optText = item.options[k];
-                        if (!optText) return null;
-                        const isWrongOpt = item.wrong_option?.toUpperCase() === k;
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                    {optionKeys.map((k) => {
+                      const optText = (item.options as any)?.[k];
+                      if (!optText) return null;
+                      const isWrong = item.wrong_option?.toUpperCase() === k;
 
-                        const lowerOpt = optText.toLocaleLowerCase('tr-TR');
-                        const lowerWrong = wrongWord.toLocaleLowerCase('tr-TR');
-                        const idx = lowerOpt.indexOf(lowerWrong);
-
-                        return (
-                          <div
-                            key={k}
-                            style={{
-                              fontSize: '0.9rem',
-                              lineHeight: 1.6,
-                              color: 'var(--text-primary)',
-                              fontWeight: isWrongOpt ? 600 : 'normal'
-                            }}
-                          >
-                            <strong>{k})</strong>{' '}
-                            {isWrongOpt && idx !== -1 ? (
-                              <span>
-                                {optText.substring(0, idx)}
-                                <del className="struck-word">{optText.substring(idx, idx + wrongWord.length)}</del>
-                                <span className="correction-badge-inline">
-                                  <span className="caret-arrow">^</span>
-                                  <span>{correctWord}</span>
-                                </span>
-                                {optText.substring(idx + wrongWord.length)}
-                              </span>
-                            ) : isWrongOpt ? (
-                              <span>
-                                <del className="struck-word">{wrongWord}</del>
-                                <span className="correction-badge-inline">
-                                  <span className="caret-arrow">^</span>
-                                  <span>{correctWord}</span>
-                                </span>{' '}
-                                {optText}
-                              </span>
-                            ) : (
-                              optText
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Solution & TDK Rule Explanation Box */}
-                  <div
-                    style={{
-                      borderTop: '1px dashed var(--color-border)',
-                      paddingTop: '10px',
-                      marginTop: '10px',
-                      backgroundColor: 'var(--bg-card-secondary)',
-                      borderRadius: '8px',
-                      padding: '10px 12px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-red)' }}>
-                        ✓ Cevap ve TDK Gerekçesi ({item.wrong_option || 'Hata'} Seçeneği)
-                      </span>
-                      <span className="rule-badge" style={{ fontSize: '0.7rem' }}>{item.rule_category}</span>
-                    </div>
-
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.45, margin: '0 0 6px 0' }}>
-                      {item.explanation}
-                    </p>
-
-                    {item.coach_note && (
-                      <div style={{ fontFamily: 'var(--font-handwriting)', fontSize: '1.08rem', color: 'var(--text-primary)', borderTop: '1px dotted var(--color-border)', paddingTop: '4px' }}>
-                        💡 Koç Notu: {item.coach_note}
-                      </div>
-                    )}
+                      return (
+                        <div
+                          key={k}
+                          style={{
+                            fontSize: '0.82rem',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: isWrong ? '#FFECEE' : 'transparent',
+                            color: isWrong ? '#D6303F' : '#3A3A3C',
+                            fontWeight: isWrong ? 700 : 'normal'
+                          }}
+                        >
+                          <strong>{k})</strong> {optText}
+                        </div>
+                      );
+                    })}
                   </div>
 
+                  {/* Handwritten Red Pen Correction Box */}
+                  <div style={{ backgroundColor: '#FAF9F6', border: '1px dashed #D6303F', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#8E8E93', fontWeight: 600 }}>Düzeltme:</span>
+                    <del style={{ color: '#D6303F', fontSize: '0.88rem' }}>{wrongWord}</del>
+                    <span style={{ color: '#D6303F', fontWeight: 800 }}>➔</span>
+                    <span style={{ fontFamily: 'var(--font-handwriting)', fontSize: '1.25rem', color: '#D6303F', fontWeight: 700 }}>
+                      ^ {correctWord}
+                    </span>
+                  </div>
+
+                  {/* TDK Rule Note */}
+                  <div style={{ fontSize: '0.8rem', color: '#636366', lineHeight: 1.4, backgroundColor: '#F2F2F7', padding: '8px 10px', borderRadius: '6px' }}>
+                    <strong>TDK Kuralı:</strong> {item.explanation}
+                  </div>
+
+                  {/* Coach Note */}
+                  {item.coach_note && (
+                    <div style={{ fontSize: '0.8rem', color: '#1C1C1E', marginTop: '6px', fontStyle: 'italic' }}>
+                      ✍️ <strong>Koç Tavsiyesi:</strong> {item.coach_note}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
-
-          {/* Booklet Footer */}
-          <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--color-border)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            TDK Projesi • Kişisel Sınav Hazırlık Bülteni
-          </div>
         </div>
 
+        {/* Modal Non-Print Actions */}
+        <div className="no-print" style={{ padding: '16px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button className="btn-secondary" onClick={onClose}>
+            Kapat
+          </button>
+          <button className="btn-primary" onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Printer size={16} /> PDF Olarak Kaydet / Yazdır
+          </button>
+        </div>
       </div>
     </div>
   );
