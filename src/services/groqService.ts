@@ -1,10 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AnalysisResult, QuestionOptions, UserError } from '../types';
 import { tdkService } from './tdkService';
+import { supabase } from '../lib/supabase';
 
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
-const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '';
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+const GROQ_API_KEY = '';
+const OPENROUTER_API_KEY = '';
+const GEMINI_API_KEY = '';
 
 export const CANONICAL_TYT_CATEGORIES = [
   'Büyük Harflerin Yazımı',
@@ -175,7 +176,7 @@ export const groqService = {
 
     // 1. Tier 1: Groq LLaMA-3.3-70B (Fast, accurate, high rate-limit, zero Gemini quota consumption)
     try {
-      if (GROQ_API_KEY) {
+      if (true) {
         const groqRes = await this.callGroqAPI(trimmed);
         if (groqRes && groqRes.wrong_option && groqRes.wrong_word) {
           return this.finalizeAnalysis(groqRes, trimmed, existingUserErrors);
@@ -187,7 +188,7 @@ export const groqService = {
 
     // 2. Tier 2: OpenRouter LLaMA-3.3-70B
     try {
-      if (OPENROUTER_API_KEY) {
+      if (true) {
         const openRouterRes = await this.callOpenRouterAPI(trimmed);
         if (openRouterRes && openRouterRes.wrong_option && openRouterRes.wrong_word) {
           return this.finalizeAnalysis(openRouterRes, trimmed, existingUserErrors);
@@ -199,7 +200,7 @@ export const groqService = {
 
     // 3. Tier 3: Gemini 2.5 Flash (Fallback only if Groq/OpenRouter are unavailable)
     try {
-      if (GEMINI_API_KEY) {
+      if (true) {
         const geminiRes = await this.callGeminiAPI(trimmed);
         if (geminiRes && geminiRes.wrong_option && geminiRes.wrong_word) {
           return this.finalizeAnalysis(geminiRes, trimmed, existingUserErrors);
@@ -214,6 +215,10 @@ export const groqService = {
   },
 
   async callGroqAPI(text: string): Promise<AnalysisResult> {
+    const proxyContent = await this.invokeAi('groq', 'llama-3.3-70b-versatile', MASTER_SYSTEM_PROMPT, `Lütfen bu soruyu analiz et:\n"""\n${text}\n"""`);
+    const proxyParsed = JSON.parse(proxyContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+    return this.sanitizeResult(proxyParsed, text);
+    /* istanbul ignore next */
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       signal: AbortSignal.timeout(30000),
@@ -243,6 +248,10 @@ export const groqService = {
   },
 
   async callOpenRouterAPI(text: string): Promise<AnalysisResult> {
+    const proxyContent = await this.invokeAi('openrouter', 'meta-llama/llama-3.3-70b-instruct', MASTER_SYSTEM_PROMPT, `Lütfen bu soruyu analiz et:\n"""\n${text}\n"""`);
+    const proxyParsed = JSON.parse(proxyContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+    return this.sanitizeResult(proxyParsed, text);
+    /* istanbul ignore next */
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       signal: AbortSignal.timeout(30000),
@@ -274,6 +283,9 @@ export const groqService = {
   },
 
   async callGeminiAPI(text: string): Promise<AnalysisResult> {
+    const proxyRaw = await this.invokeAi('gemini', 'gemini-2.5-flash', '', `${MASTER_SYSTEM_PROMPT}\n\nAnaliz Edilecek Soru Metni:\n${text}`);
+    return this.sanitizeResult(JSON.parse(proxyRaw), text);
+    /* istanbul ignore next */
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
@@ -285,6 +297,12 @@ export const groqService = {
     const raw = res.response.text();
     const parsed = JSON.parse(raw);
     return this.sanitizeResult(parsed, text);
+  },
+
+  async invokeAi(provider: 'groq' | 'openrouter' | 'gemini', model: string, systemPrompt: string, prompt: string): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('ai-proxy', { body: { provider, model, systemPrompt, prompt } });
+    if (error || !data?.content) throw new Error(error?.message || data?.error || 'AI servisi yanıt vermedi.');
+    return data.content;
   },
 
   sanitizeResult(raw: any, fallbackText: string): AnalysisResult {
