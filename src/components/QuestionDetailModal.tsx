@@ -274,7 +274,10 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
                 <div className="coach-note-card">
                   <div className="coach-note-header">KOÇ NOTU</div>
                   <div className="coach-note-content">
-                    ! {errorItem.coach_note}
+                    <span className="coach-handwriting-icon" aria-hidden="true">!</span>
+                    <div className="coach-note-text">
+                      {errorItem.coach_note}
+                    </div>
                   </div>
                 </div>
               )}
