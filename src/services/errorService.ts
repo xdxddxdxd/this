@@ -18,11 +18,11 @@ export const errorService = {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data) {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
         return data as UserError[];
       }
-      return local;
+      return data as UserError[];
     } catch (err) {
       console.warn('Supabase fetch failed, using local storage cache:', err);
       return local;
@@ -44,7 +44,8 @@ export const errorService = {
 
     if (isSupabaseConfigured && errorItem.user_id && errorItem.user_id !== 'local-user') {
       try {
-        await supabase.from('user_errors').insert([fullItem]);
+        const { error } = await supabase.from('user_errors').insert([fullItem]);
+        if (error) throw error;
       } catch (err) {
         console.warn('Supabase insert failed, persisted in local cache:', err);
       }
@@ -60,7 +61,8 @@ export const errorService = {
 
     if (isSupabaseConfigured && userId && userId !== 'local-user') {
       try {
-        await supabase.from('user_errors').update(updates).eq('id', id);
+        const { error } = await supabase.from('user_errors').update(updates).eq('id', id).eq('user_id', userId);
+        if (error) throw error;
       } catch (err) {
         console.warn('Supabase update failed:', err);
       }
@@ -74,7 +76,8 @@ export const errorService = {
 
     if (isSupabaseConfigured && userId && userId !== 'local-user') {
       try {
-        await supabase.from('user_errors').delete().eq('id', id);
+        const { error } = await supabase.from('user_errors').delete().eq('id', id).eq('user_id', userId);
+        if (error) throw error;
       } catch (err) {
         console.warn('Supabase delete failed:', err);
       }
@@ -88,7 +91,8 @@ export const errorService = {
 
     if (isSupabaseConfigured && userId && userId !== 'local-user') {
       try {
-        await supabase.from('user_errors').delete().in('id', ids);
+        const { error } = await supabase.from('user_errors').delete().in('id', ids).eq('user_id', userId);
+        if (error) throw error;
       } catch (err) {
         console.warn('Supabase bulk delete failed:', err);
       }
@@ -102,7 +106,8 @@ export const errorService = {
 
     if (isSupabaseConfigured && userId && userId !== 'local-user') {
       try {
-        await supabase.from('user_errors').update({ is_favorite: isFavorite }).in('id', ids);
+        const { error } = await supabase.from('user_errors').update({ is_favorite: isFavorite }).in('id', ids).eq('user_id', userId);
+        if (error) throw error;
       } catch (err) {
         console.warn('Supabase bulk favorite failed:', err);
       }
