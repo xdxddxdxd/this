@@ -1,20 +1,11 @@
-// Advanced question normalizer and splitter for messy / glued text
-
 export function normalizeQuestionText(text: string): string {
-  if (!text) return '';
-
-  let normalized = text;
-
-  // 1. Separate glued question numbers after sentences, e.g. "bekleniyor.2. Aşağıdaki" -> "bekleniyor.\n\n2. Aşağıdaki"
-  normalized = normalized.replace(/([\.?!])\s*(\d{1,2}\s*[\.\)\-]\s+[A-ZÇĞİÖŞÜ])/g, '$1\n\n$2');
-
-  // 2. Separate glued option letters, e.g. "vardır?A) Akşamüstü" or "kilitledi.B) Her" -> "vardır?\nA) Akşamüstü\nB) Her"
-  normalized = normalized.replace(/([\.?!;:,a-zçğıöşüA-ZÇĞİÖŞÜ0-9])\s*([A-E]\s*[\)\.\-])\s*/g, '$1\n$2 ');
-
-  // 3. Ensure single clean spacing after option marker "A)  Text" -> "A) Text"
-  normalized = normalized.replace(/([A-E]\s*[\)\.\-])\s+/g, '$1 ');
-
-  return normalized.trim();
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\t/g, ' ')
+    .replace(/[ \u00A0]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 export function splitQuestions(rawText: string): string[] {
@@ -33,15 +24,47 @@ export function splitQuestions(rawText: string): string[] {
   }
 
   if (matches.length > 1) {
-    const questions: string[] = [];
+    const rawChunks: string[] = [];
     for (let i = 0; i < matches.length; i++) {
       const startIndex = matches[i].index;
       const endIndex = i + 1 < matches.length ? matches[i + 1].index : normalized.length;
       const chunk = normalized.slice(startIndex, endIndex).trim();
       if (chunk.length > 15) {
-        questions.push(chunk);
+        rawChunks.push(chunk);
       }
     }
+
+    // Attach leading introductory text before question 1 if present
+    if (matches[0].index > 0) {
+      const leadingText = normalized.slice(0, matches[0].index).trim();
+      if (leadingText.length > 15 && rawChunks.length > 0) {
+        rawChunks[0] = leadingText + '\n\n' + rawChunks[0];
+      }
+    }
+
+    // Smart trailing paragraph reattachment:
+    // If a chunk ends with an orphan paragraph after its options (e.g. after option E),
+    // and the next chunk starts with "Bu parçadaki..." or similar, move the paragraph to the next chunk!
+    const questions: string[] = [];
+    for (let i = 0; i < rawChunks.length; i++) {
+      let current = rawChunks[i];
+      if (i < rawChunks.length - 1) {
+        // Find last option in current chunk
+        const lastOptMatches = [...current.matchAll(/\n\s*([A-E]\s*[\)\.\-]\s*[^\n]+)/gi)];
+        const lastOptMatch = lastOptMatches.pop();
+        if (lastOptMatch && lastOptMatch.index !== undefined) {
+          const afterLastOptIdx = lastOptMatch.index + lastOptMatch[0].length;
+          const trailingText = current.slice(afterLastOptIdx).trim();
+          if (trailingText.length > 25) {
+            // Cut trailingText from current chunk and prepend to next chunk
+            current = current.slice(0, afterLastOptIdx).trim();
+            rawChunks[i + 1] = trailingText + '\n\n' + rawChunks[i + 1];
+          }
+        }
+      }
+      questions.push(current);
+    }
+
     if (questions.length > 1) {
       return questions;
     }
@@ -71,4 +94,69 @@ export function splitQuestions(rawText: string): string[] {
   }
 
   return [normalized];
+}
+
+/**
+ * Extracts words/phrases associated with Roman numerals (I, II, III, IV, V) in text
+ */
+export function extractRomanNumeralPhrases(text: string): Record<string, string> {
+  const phrases: Record<string, string> = {};
+  if (!text) return phrases;
+
+  // Regex captures: (I) target_phrase or (I.) target_phrase
+  const regex = /\((I|II|III|IV|V|VI|VII|VIII|IX|X)\.?\)\s*([^()\n]{1,60}?)(?=\s*\([I|V|X]|\s*[,.!?]|\s*$|\s*[0-9]+\.|\s*[A-E]\))/gi;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const numeral = match[1].toUpperCase();
+    const rawPhrase = match[2].trim().replace(/[.,;:!?]+$/, '').trim();
+    if (rawPhrase) {
+      phrases[numeral] = rawPhrase;
+    }
+  }
+
+  // Fallback pattern if first pass didn't catch 2+
+  if (Object.keys(phrases).length < 2) {
+    const simpleRegex = /\((I|II|III|IV|V|VI|VII|VIII|IX|X)\.?\)\s*([^\s()]+\s*[^\s()]*\s*[^\s()]*)/gi;
+    let m2;
+    while ((m2 = simpleRegex.exec(text)) !== null) {
+      const numeral = m2[1].toUpperCase();
+      if (!phrases[numeral]) {
+        phrases[numeral] = m2[2].trim().replace(/[.,;!?]+$/, '');
+      }
+    }
+  }
+
+  return phrases;
+}
+
+/**
+ * Enriches options that only have Roman numerals (e.g. A: "I", B: "II")
+ * with the corresponding words from the question text:
+ * e.g. A: "I. (Oldum olası)", B: "II. (çekidüzen)"
+ */
+export function enrichOptionsWithPhrases(
+  questionText: string,
+  options: Record<string, string | undefined>
+): Record<string, string> {
+  const phrases = extractRomanNumeralPhrases(questionText);
+  const enriched: Record<string, string> = {};
+
+  ['A', 'B', 'C', 'D', 'E'].forEach((k) => {
+    const raw = (options[k] || '').trim();
+    // Check if raw option is just a Roman numeral like "I", "I.", "II", "II."
+    const romanMatch = raw.match(/^(?:([I|V|X]+)|(\d{1,2}))[\.\)]?$/i);
+    if (romanMatch) {
+      const key = (romanMatch[1] || romanMatch[2]).toUpperCase();
+      const phrase = phrases[key];
+      if (phrase) {
+        enriched[k] = `${key}. (${phrase})`;
+      } else {
+        enriched[k] = raw;
+      }
+    } else {
+      enriched[k] = raw;
+    }
+  });
+
+  return enriched;
 }
