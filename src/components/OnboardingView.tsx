@@ -34,7 +34,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
 }) => {
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -42,8 +42,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) {
-      setErrorMsg('Lütfen bir kullanıcı adı girin.');
+    if (!email.trim() || !email.includes('@')) {
+      setErrorMsg('Lütfen geçerli bir e-posta adresi girin.');
       return;
     }
 
@@ -52,14 +52,14 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
 
     try {
       if (isRegister) {
-        const res = await authService.register(username, fullName, password || '123456');
+        const res = await authService.register(email, fullName, password);
         if (res.user) {
           onSuccess(res.user);
         } else {
           setErrorMsg(res.error || 'Kayıt sırasında bir hata oluştu.');
         }
       } else {
-        const res = await authService.login(username, password || '123456');
+        const res = await authService.login(email, password);
         if (res.user) {
           onSuccess(res.user);
         } else {
@@ -257,20 +257,21 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Kullanıcı Adı
+                  E-posta Adresi
                 </label>
                 <input
                   className="form-input"
-                  placeholder="Örn: dogukan"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  placeholder="ornek@eposta.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Şifre (İsteğe bağlı)
+                  Şifre
                 </label>
                 <input
                   type="password"
@@ -278,6 +279,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  minLength={8}
+                  required
                 />
               </div>
 
