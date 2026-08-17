@@ -731,86 +731,86 @@ Sadece şu JSON nesnesini döndür:
       "coach_note": "Taktik: 'etmek' yardımcı fiilinde ses olayı yoksa ayrı yazılır: 'ayırt etmek', 'fark etmek', 'terk etmek'!"
     }
   ]
-}
+}`;
 
-const makeSingleChunkCall = async (chunk: typeof targets): Promise<any[]> => {
-  const promptItems = chunk.map((t, idx) => 
-    `Soru ${idx + 1}: Yanlış yazılan kelime: "${t.wrong_word}", Doğru yazılışı: "${t.correct_word}", Kural kategorisi: "${t.category}"`
-  ).join('\n');
+    const makeSingleChunkCall = async (chunk: typeof targets): Promise<any[]> => {
+      const promptItems = chunk.map((t, idx) => 
+        `Soru ${idx + 1}: Yanlış yazılan kelime: "${t.wrong_word}", Doğru yazılışı: "${t.correct_word}", Kural kategorisi: "${t.category}"`
+      ).join('\n');
 
-  const executeCall = async (endpoint: string, key: string, model: string, extraHeaders = {}) => {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      signal: AbortSignal.timeout(25000),
-      headers: {
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        ...extraHeaders
-      },
-      body: JSON.stringify({
-        model,
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Lütfen şu ${chunk.length} adet soru için TYT sınav sorularını üret:\n${promptItems}` }
-        ]
-      })
+      const executeCall = async (endpoint: string, key: string, model: string, extraHeaders = {}) => {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          signal: AbortSignal.timeout(25000),
+          headers: {
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            ...extraHeaders
+          },
+          body: JSON.stringify({
+            model,
+            response_format: { type: 'json_object' },
+            temperature: 0.7,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Lütfen şu ${chunk.length} adet soru için TYT sınav sorularını üret:\n${promptItems}` }
+            ]
+          })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const rawContent = data.choices?.[0]?.message?.content || '{}';
+        const parsed = JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+        return Array.isArray(parsed?.questions) ? parsed.questions : [];
+      };
+
+      // 0. Tier 0: Cerebras LLaMA-3.3-70B (ücretsiz 1M token/gün — Groq kotası tükenince yedek)
+      if (CEREBRAS_API_KEY) {
+        try {
+          const res = await executeCall('https://api.cerebras.ai/v1/chat/completions', CEREBRAS_API_KEY, CEREBRAS_MODEL);
+          if (res.length > 0) return res;
+        } catch (err) {
+          console.warn('Cerebras chunk failed, trying Groq fallback...', err);
+        }
+      }
+
+      // 1. Tier 1: Groq LLaMA-3.3-70B
+      if (GROQ_API_KEY) {
+        try {
+          const res = await executeCall('https://api.groq.com/openai/v1/chat/completions', GROQ_API_KEY, 'llama-3.3-70b-versatile');
+          if (res.length > 0) return res;
+        } catch (err) {
+          console.warn('Groq chunk failed, trying OpenRouter fallback...', err);
+        }
+      }
+
+      // 2. Tier 2: OpenRouter LLaMA-3.3-70B
+      if (OPENROUTER_API_KEY) {
+        try {
+          const res = await executeCall('https://openrouter.ai/api/v1/chat/completions', OPENROUTER_API_KEY, 'meta-llama/llama-3.3-70b-instruct', {
+            'HTTP-Referer': 'http://localhost:3000',
+            'X-Title': 'TDK TYT Master'
+          });
+          if (res.length > 0) return res;
+        } catch (err) {
+          console.warn('OpenRouter chunk failed:', err);
+        }
+      }
+
+      return [];
+    };
+
+    // Run all chunks in parallel for maximum speed (e.g. 15 questions take ~3-4s total)
+    const chunkPromises = chunks.map(chunk => makeSingleChunkCall(chunk));
+    const results = await Promise.allSettled(chunkPromises);
+
+    const allQuestions: any[] = [];
+    results.forEach((res) => {
+      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+        allQuestions.push(...res.value);
+      }
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    const rawContent = data.choices?.[0]?.message?.content || '{}';
-    const parsed = JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
-    return Array.isArray(parsed?.questions) ? parsed.questions : [];
-  };
 
-  // 0. Tier 0: Cerebras LLaMA-3.3-70B (ücretsiz 1M token/gün — Groq kotası tükenince yedek)
-  if (CEREBRAS_API_KEY) {
-    try {
-      const res = await executeCall('https://api.cerebras.ai/v1/chat/completions', CEREBRAS_API_KEY, CEREBRAS_MODEL);
-      if (res.length > 0) return res;
-    } catch (err) {
-      console.warn('Cerebras chunk failed, trying Groq fallback...', err);
-    }
+    return allQuestions;
   }
-
-  // 1. Tier 1: Groq LLaMA-3.3-70B
-  if (GROQ_API_KEY) {
-    try {
-      const res = await executeCall('https://api.groq.com/openai/v1/chat/completions', GROQ_API_KEY, 'llama-3.3-70b-versatile');
-      if (res.length > 0) return res;
-    } catch (err) {
-      console.warn('Groq chunk failed, trying OpenRouter fallback...', err);
-    }
-  }
-
-  // 2. Tier 2: OpenRouter LLaMA-3.3-70B
-  if (OPENROUTER_API_KEY) {
-    try {
-      const res = await executeCall('https://openrouter.ai/api/v1/chat/completions', OPENROUTER_API_KEY, 'meta-llama/llama-3.3-70b-instruct', {
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'TDK TYT Master'
-      });
-      if (res.length > 0) return res;
-    } catch (err) {
-      console.warn('OpenRouter chunk failed:', err);
-    }
-  }
-
-  return [];
-};
-
-// Run all chunks in parallel for maximum speed (e.g. 15 questions take ~3-4s total)
-const chunkPromises = chunks.map(chunk => makeSingleChunkCall(chunk));
-const results = await Promise.allSettled(chunkPromises);
-
-const allQuestions: any[] = [];
-results.forEach((res) => {
-  if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-    allQuestions.push(...res.value);
-  }
-});
-
-return allQuestions;
-}
 };
