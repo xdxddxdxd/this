@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, XCircle, ArrowRight, RotateCcw, Award, Sparkles, RefreshCw } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { fireConfetti } from '../utils/celebrate';
 import { UserError } from '../types';
 import { quizGeneratorService, DynamicQuizQuestion } from '../services/quizGeneratorService';
 
@@ -48,7 +48,7 @@ export const FlashcardQuizModal: React.FC<FlashcardQuizModalProps> = ({
     const isCorrect = optKey.toUpperCase() === correctOption;
     if (isCorrect) {
       setScore((prev) => prev + 1);
-      confetti({
+      fireConfetti({
         particleCount: 40,
         spread: 50,
         origin: { y: 0.7 },
@@ -64,7 +64,7 @@ export const FlashcardQuizModal: React.FC<FlashcardQuizModalProps> = ({
       setIsRevealed(false);
     } else {
       setIsCompleted(true);
-      confetti({
+      fireConfetti({
         particleCount: 80,
         spread: 70,
         origin: { y: 0.6 },
