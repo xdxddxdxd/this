@@ -45,6 +45,11 @@ export function splitQuestions(rawText: string): string[] {
     // Smart trailing paragraph reattachment:
     // If a chunk ends with an orphan paragraph after its options (e.g. after option E),
     // and the next chunk starts with "Bu parçadaki..." or similar, move the paragraph to the next chunk!
+    // EXCEPTION: "(I) kelime" biçimindeki kısa satırlar altı çizili sözcük listesidir ve
+    // ait olduğu sorunun kendisinde kalır; yalnızca listeden sonraki metin taşınır.
+    const isUnderlineListLine = (line: string) =>
+      /^\s*\((?:I{1,3}|IV|V|VI{0,3}|IX|X)\.?\)\s*\S.{0,45}$/.test(line);
+
     const questions: string[] = [];
     for (let i = 0; i < rawChunks.length; i++) {
       let current = rawChunks[i];
@@ -56,9 +61,35 @@ export function splitQuestions(rawText: string): string[] {
           const afterLastOptIdx = lastOptMatch.index + lastOptMatch[0].length;
           const trailingText = current.slice(afterLastOptIdx).trim();
           if (trailingText.length > 25) {
-            // Cut trailingText from current chunk and prepend to next chunk
-            current = current.slice(0, afterLastOptIdx).trim();
-            rawChunks[i + 1] = trailingText + '\n\n' + rawChunks[i + 1];
+            const lines = trailingText.split('\n');
+            let cursor = 0;
+            const skipBlanks = () => {
+              while (cursor < lines.length && lines[cursor].trim() === '') cursor++;
+            };
+            skipBlanks();
+            // Kaynak satırını atla: "(2016-KPSS/Lisans)" vb.
+            if (cursor < lines.length && /^\s*\(\s*\d{4}/.test(lines[cursor])) cursor++;
+            skipBlanks();
+            // Ardışık kısa "(I) kelime" satırları = altı çizili sözcük listesi
+            let listLineCount = 0;
+            while (cursor < lines.length && isUnderlineListLine(lines[cursor])) {
+              cursor++;
+              listLineCount++;
+            }
+            if (listLineCount >= 2) {
+              // Liste bu soruya aittir; yalnız listeden sonraki metin (bir
+              // sonraki sorunun paragrafı) sonraki parçaya taşınır.
+              const keep = lines.slice(0, cursor).join('\n').trim();
+              const rest = lines.slice(cursor).join('\n').trim();
+              current = (current.slice(0, afterLastOptIdx).trim() + '\n' + keep).trim();
+              if (rest.length > 25) {
+                rawChunks[i + 1] = rest + '\n\n' + rawChunks[i + 1];
+              }
+            } else {
+              // Klasik davranış: artık metnin tamamı sonraki sorunun paragrafıdır.
+              current = current.slice(0, afterLastOptIdx).trim();
+              rawChunks[i + 1] = trailingText + '\n\n' + rawChunks[i + 1];
+            }
           }
         }
       }

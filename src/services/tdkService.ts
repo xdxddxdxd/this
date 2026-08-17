@@ -304,12 +304,12 @@ export const VERIFIED_RULES_DB: VerifiedSpellingRule[] = [
     coachNote: "Doğru yazılışı 'orijinal' şeklindedir (iki 'i' vardır)."
   },
   {
-    wrongRegex: /\b(ünvan\w*)\b/i,
-    wrongDisplay: 'ünvan',
-    correctDisplay: 'unvan',
-    category: 'Bitişik Yazılan Birleşik Kelimeler',
-    explanation: "TDK'ye göre sözcük 'u' harfiyle 'unvan' şeklinde yazılır.",
-    coachNote: "TDK güncel kılavuzunda 'unvan' olarak yer alır."
+    wrongRegex: /\b(unvan\w*)\b/i,
+    wrongDisplay: 'unvan',
+    correctDisplay: 'ünvan',
+    category: 'Ses Olayları ve Yardımcı Fiiller',
+    explanation: "TDK Güncel Türkçe Sözlüğü'nde madde başı 'ünvan' biçimindedir; 'unvan' yazımı yanlıştır.",
+    coachNote: "Akılda tut: 'ünvan' ünlüsüyle yazılır ('ün' + 'van'), 'unvan' biçimi sınavlarda klasik tuzaktır."
   },
   {
     wrongRegex: /\b(dinazor\w*)\b/i,
@@ -438,14 +438,5 @@ export const tdkService = {
     }
 
     return clean;
-  },
-
-  async verifyWithTdk(word: string): Promise<{ isValid: boolean; correctForm?: string }> {
-    if (!word) return { isValid: true, correctForm: word };
-    const clean = word.toLocaleLowerCase('tr-TR').trim();
-    if (TDK_CORRECT_WHITELIST.has(clean)) {
-      return { isValid: true, correctForm: clean };
-    }
-    return { isValid: true, correctForm: word };
   }
 };
