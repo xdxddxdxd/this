@@ -11,6 +11,8 @@ import {
   Award
 } from 'lucide-react';
 import { User, UserError } from '../types';
+// Recharts yalnızca profil sekmesi açıldığında yüklenir.
+const AnalyticsPanel = lazy(() => import('./AnalyticsPanel').then((module) => ({ default: module.AnalyticsPanel })));
 const PdfExportModal = lazy(() => import('./PdfExportModal').then((module) => ({ default: module.PdfExportModal })));
 
 interface ProfileProps {
@@ -197,39 +199,10 @@ export const Profile: React.FC<ProfileProps> = ({
         </div>
       </div>
 
-      {/* 5. Category Breakdown */}
-      <div className="rule-explanation-card" style={{ padding: '14px 16px' }}>
-        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', fontWeight: 700, marginBottom: '12px' }}>
-          Zayıf Noktalar & Kural Dağılımı
-        </h3>
-        {Object.keys(categoryStats).length === 0 ? (
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Henüz yeterli hata verisi toplanmadı.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {Object.entries(categoryStats).map(([cat, count]) => {
-              const pct = Math.round((count / errors.length) * 100);
-              return (
-                <div key={cat}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '3px' }}>
-                    <span style={{ fontWeight: 600 }}>{cat}</span>
-                    <span style={{ color: 'var(--text-secondary)' }}>{count} kez ({pct}%)</span>
-                  </div>
-                  <div style={{ width: '100%', height: '5px', backgroundColor: 'var(--bg-card-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        width: `${pct}%`,
-                        height: '100%',
-                        backgroundColor: pct > 30 ? 'var(--color-red)' : 'var(--text-primary)',
-                        borderRadius: '4px'
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {/* 5. Gelişim Panosu: kategori dağılımı + haftalık trend */}
+      <Suspense fallback={<div className="rule-explanation-card" style={{ padding: '14px 16px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>Gelişim panosu yükleniyor...</div>}>
+        <AnalyticsPanel errors={errors} theme={theme} />
+      </Suspense>
 
       {/* 6. System Status Card */}
       <div className="rule-explanation-card" style={{ padding: '14px 16px' }}>
