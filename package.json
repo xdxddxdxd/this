@@ -10,13 +10,13 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@sentry/react": "^10.70.0",
     "@supabase/supabase-js": "^2.49.1",
     "canvas-confetti": "^1.9.4",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^4.2.1",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",

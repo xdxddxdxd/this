@@ -6,12 +6,13 @@ import { Dashboard } from './components/Dashboard';
 import { MyErrors } from './components/MyErrors';
 import { Profile } from './components/Profile';
 import { BottomNav } from './components/BottomNav';
-import { QuestionDetailModal } from './components/QuestionDetailModal';
 import { AuthModal } from './components/AuthModal';
-import { OnboardingView } from './components/OnboardingView';
-import { CustomQuizModal } from './components/CustomQuizModal';
 
+// Ağır modallar ve giriş ekranı yalnızca gerektiğinde yüklenir.
+const OnboardingView = lazy(() => import('./components/OnboardingView').then((module) => ({ default: module.OnboardingView })));
 const AddQuestionModal = lazy(() => import('./components/AddQuestionModal').then((module) => ({ default: module.AddQuestionModal })));
+const QuestionDetailModal = lazy(() => import('./components/QuestionDetailModal').then((module) => ({ default: module.QuestionDetailModal })));
+const CustomQuizModal = lazy(() => import('./components/CustomQuizModal').then((module) => ({ default: module.CustomQuizModal })));
 
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -155,7 +156,11 @@ export function App() {
   }
 
   if (!currentUser) {
-    return <OnboardingView onSuccess={setCurrentUser} theme={theme} onToggleTheme={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')} />;
+    return (
+      <Suspense fallback={<div className="app-container" aria-busy="true" />}>
+        <OnboardingView onSuccess={setCurrentUser} theme={theme} onToggleTheme={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')} />
+      </Suspense>
+    );
   }
 
   return (
@@ -221,12 +226,14 @@ export function App() {
 
       {/* Soru Detay Modalı */}
       {selectedError && (
-        <QuestionDetailModal
-          errorItem={selectedError}
-          onClose={() => setSelectedError(null)}
-          onDelete={handleDeleteError}
-          onUpdate={handleUpdateError}
-        />
+        <Suspense fallback={null}>
+          <QuestionDetailModal
+            errorItem={selectedError}
+            onClose={() => setSelectedError(null)}
+            onDelete={handleDeleteError}
+            onUpdate={handleUpdateError}
+          />
+        </Suspense>
       )}
 
       {/* Giriş / Hesap Değiştirme Modalı */}
@@ -240,11 +247,13 @@ export function App() {
       />
 
       {/* 🎯 Kişiselleştirilmiş Özel Hata Sınavı Modalı */}
-      <CustomQuizModal
-        isOpen={isQuizModalOpen}
-        onClose={() => setIsQuizModalOpen(false)}
-        errors={errors}
-      />
+      <Suspense fallback={null}>
+        <CustomQuizModal
+          isOpen={isQuizModalOpen}
+          onClose={() => setIsQuizModalOpen(false)}
+          errors={errors}
+        />
+      </Suspense>
     </div>
   );
 }
